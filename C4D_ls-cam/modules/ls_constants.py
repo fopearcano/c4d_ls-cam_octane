@@ -8,6 +8,26 @@ rig builder, the UI layer, and the Octane integration helpers.
 """
 
 # ---------------------------------------------------------------------------
+# Distribution metadata
+# ---------------------------------------------------------------------------
+
+# Semantic version. ``alpha`` suffix signals the API + scene-graph
+# layout may still change between drops. Bump in lockstep with
+# CHANGELOG entries.
+__version__ = "0.1.0-alpha"
+PLUGIN_VERSION = __version__
+
+# One-line description used in the registration logs and in the
+# Help/About text Cinema 4D shows for the menu items.
+PLUGIN_DESCRIPTION = (
+    "Special-relativistic camera rig for Cinema 4D 2025+: gamma + "
+    "Lorentz contraction, FOV / DoF / exposure modes, Doppler "
+    "material colour shift, searchlight beaming, geometry proxy, "
+    "Octane camera-tag integration, A Slower Speed of Light "
+    "presets, and an artistic Terrell-rotation placeholder."
+)
+
+# ---------------------------------------------------------------------------
 # Plugin identity
 # ---------------------------------------------------------------------------
 
@@ -104,7 +124,7 @@ UD_VELOCITY_CUSTOM_VECTOR = "velocity_custom_vector"
 
 # ---- Doppler material controls --------------------------------------------
 # Per-material RGB shift strength. Multiplied into the wavelength-shift
-# alpha by ls_doppler_materials.apply_doppler_color_shift; 0 freezes the
+# alpha by ls_materials.apply_doppler_color_shift; 0 freezes the
 # duplicates at their baseline colour (matches the "effect off" path
 # the evaluator already runs when enable_doppler_color is False).
 UD_DOPPLER_COLOR_STRENGTH = "doppler_color_strength"

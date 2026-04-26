@@ -1,6 +1,6 @@
 """
-ls_doppler_materials.py
-=======================
+ls_materials.py
+===============
 Non-destructive Doppler colour-shift system for scene materials.
 
 User flow
@@ -356,7 +356,7 @@ def add_doppler_controller(doc):
             "Created {0} duplicate(s); {1} use a non-classic material "
             "type and will not have their colour shifted live yet "
             "(node-graph engines such as Octane / Redshift need per-"
-            "engine code -- see TODO in ls_doppler_materials.py).".format(
+            "engine code -- see TODO in ls_materials.py).".format(
                 created, skipped_non_classic
             )
         )

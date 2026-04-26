@@ -1,12 +1,17 @@
 # C4D_ls-cam
 
-A Cinema 4D 2025+ Python plugin that builds a **Relativistic Camera Rig**
-ready for special-relativity (Lorentz contraction, relativistic Doppler,
-relativistic aberration / "searchlight effect") experiments and Octane
-rendering integration.
+**Version: 0.1.0-alpha** &nbsp;·&nbsp; License: MIT &nbsp;·&nbsp; Cinema 4D 2025+ (Python 3 SDK)
 
-> Status: **skeleton**. The rig and all user-data parameters are wired up,
-> but the relativistic math is intentionally not implemented yet.
+Special-relativistic camera rig for Cinema 4D 2025+: gamma + Lorentz
+contraction, FOV / DoF / exposure modes, Doppler material colour shift,
+searchlight beaming, geometry proxy, Octane camera-tag integration,
+A Slower Speed of Light presets, and an artistic Terrell-rotation
+placeholder. No external dependencies; no compiled binaries.
+
+> Status: **0.1.0-alpha** — every approximation is in place and
+> reversible, but the API and scene-graph layout may still change
+> between drops. See [CHANGELOG.md](CHANGELOG.md) and
+> [Known limitations](#known-limitations) below.
 
 ---
 
@@ -434,6 +439,16 @@ pass plugin, or scripted camera). Search for `TODO: ray-level` in
 
 ## Installation
 
+**Requirements**
+
+* **Cinema 4D 2025+** (Python 3 SDK).
+* **Octane for C4D** is **optional**. The plugin discovers the Octane
+  Camera Tag at runtime; if Octane isn't installed, the Octane code
+  paths no-op silently and every other effect still works.
+* No external Python packages, no compiled binaries.
+
+**Steps**
+
 1. **Locate your Cinema 4D plugin folder.**
    Either of these works (use the per-user folder if you don't have admin
    rights on the C4D install):
@@ -443,24 +458,78 @@ pass plugin, or scripted camera). Search for `TODO: ray-level` in
      - Linux: `~/.config/Maxon/<C4D version>/plugins/`
    - **System-wide:** `<Cinema 4D install dir>/plugins/`
 
-2. **Copy the `C4D_ls-cam/` folder** (the one that contains
-   `c4d_ls_cam.pyp`) into that `plugins/` directory. The folder must be
-   copied as a whole — the `.pyp` file relies on its sibling modules.
+2. **Copy the `C4D_ls-cam/` folder** (the whole folder, including its
+   `modules/` subdirectory) into that `plugins/` directory. The
+   `.pyp` file relies on the modules in `modules/` — copy as a unit.
 
 3. **Restart Cinema 4D.** On startup, the Python console should print:
 
    ```
-   [C4D_ls-cam] Registered command plugin id=1000001.
+   [C4D_ls-cam] C4D_ls-cam v0.1.0-alpha loading...
+   [C4D_ls-cam] Registered command id=1000001 (Create LS Relativistic Camera Rig).
+   ... (one line per command, 1000001 through 1000009)
    ```
 
 4. **Run the command.** Open the **Extensions** menu and pick
    *Create LS Relativistic Camera Rig*. The new rig appears at the world
    origin and the camera is selected.
 
-> **Plugin ID note:** `1000001` is a development-only placeholder in the
-> Maxon-reserved test range. Before public distribution, register a real
-> plugin ID at <https://plugincafe.maxon.net/c4dpluginid_cp> and replace
-> `PLUGIN_ID` in `ls_constants.py`.
+> **Plugin ID note:** `1000001`–`1000009` are development-only
+> placeholders in the Maxon-reserved test range. Before public
+> distribution, register real plugin IDs at
+> <https://plugincafe.maxon.net/c4dpluginid_cp> and replace the
+> `PLUGIN_ID*` constants in `modules/ls_constants.py`.
+
+### Octane compatibility
+
+Octane is optional and discovered at runtime — there is no version
+pin. The plugin scans registered tag plugins for one whose name
+contains both `octane` and `camera`, so most Octane builds (Studio,
+Enterprise, Free) work without configuration. Two follow-up steps
+are required before the Octane integration drives parameters:
+
+1. **Verify the Octane Camera Tag plugin ID.** If discovery picks
+   the wrong plugin (or your Octane build registers under an
+   unexpected name), set `OCTANE_CAMERA_TAG_ID` at the top of
+   `modules/ls_octane.py` to override.
+2. **Map the Octane Camera Tag parameter IDs.** Run
+   `ls_octane.dump_octane_tag_parameters(doc.GetActiveTag())` in the
+   C4D Console with an Octane Camera Tag selected, then paste the
+   printed IDs into `modules/ls_octane_params.py`. Per-engine
+   workflow is documented in *"How to map Octane parameter IDs"*
+   below.
+
+Without those two steps the Octane code paths are inert no-ops —
+they never write guessed IDs and never crash if Octane is absent.
+
+### Known limitations
+
+* **True relativistic rendering needs ray-level renderer / shader
+  integration.** Every visual effect this plugin ships is an
+  approximation that operates at the scene-graph or material level.
+  Real special-relativistic visual phenomena (per-pixel aberration
+  warp, retarded-time sampling, light-cone integration) require a
+  custom renderer or shader pass and are explicitly out of scope.
+* **Geometry deformation is approximate.** The
+  `LS_Geometry_Proxy` system applies a uniform scale along one axis
+  via a parent null. It is *not* a per-vertex Lorentz transform and
+  does *not* implement Terrell-Penrose rotation. Skinned / animated
+  meshes are warned about at proxy creation time but still wrap
+  mechanically — the contraction composes on top of the animation,
+  which can interact badly with skin deformers.
+* **Doppler material colour shift is approximate.** The shift uses
+  an artistic R↔G↔B cascade scaled by the relativistic Doppler
+  factor `D`. It is not a spectral renderer and does not re-tint
+  textures, only the flat colour channel of classic
+  `c4d.Mmaterial`. Octane / Redshift / Arnold node-graph materials
+  are still cloned (so the lifecycle works) but their per-tick
+  colour write is skipped pending per-engine code.
+* **Octane parameter IDs may need local mapping.** The slot table
+  in `ls_octane_params.py` ships every entry as `param_id: None`
+  because Octane parameter IDs are not version-stable. The
+  evaluator deliberately skips unmapped slots — it never guesses,
+  because a wrong ID could overwrite an unrelated parameter. See
+  the *"How to map Octane parameter IDs"* section.
 
 ---
 
@@ -545,23 +614,25 @@ placeholders, and you fill them in once per Octane version:
 
 ```
 C4D_ls-cam/
-├── c4d_ls_cam.pyp     # plugin entry point + CommandData registration
-├── ls_constants.py    # IDs, names, user-data definitions
-├── ls_rig.py          # rig builder (camera, null, tag, user data, undo)
-├── ls_evaluator.py    # update_ls_camera_rig + reset_ls_camera_rig
-├── ls_geometry.py     # LS_Geometry_Proxy add/remove + live contraction
-├── ls_doppler_materials.py  # LS_Doppler_<name> material clones + live colour shift
-├── ls_searchlight.py  # per-target relativistic-beaming intensity (viewport / luminance / Octane)
-├── ls_presets.py      # A Slower Speed of Light preset table + apply_preset
-├── ls_diagnostics.py  # HUD overlay + cos-theta debug material preview
-├── ls_terrell.py      # Advanced: artistic Terrell-rotation placeholder (NOT real)
-├── ls_octane.py       # Octane discovery / attach / dump
-├── ls_octane_params.py    # symbolic slot table for Octane camera-tag params
-├── ls_relativity_math.py  # pure-Python relativistic helpers (no c4d import)
-├── ls_ui.py           # status / dialog / console helpers
-├── res/               # icons, .res / .str files (reserved)
+├── c4d_ls_cam.pyp                  # plugin entry point + CommandData registration
+├── modules/
+│   ├── ls_constants.py             # IDs, names, user-data + tuning constants
+│   ├── ls_rig.py                   # rig builder + remove_rig + find_rig_in_document
+│   ├── ls_relativity_math.py       # pure-Python physical helpers (no c4d import)
+│   ├── ls_octane.py                # Octane discovery / attach / dump
+│   ├── ls_octane_params.py         # symbolic slot table for Octane camera-tag params
+│   ├── ls_presets.py               # A Slower Speed of Light preset table
+│   ├── ls_geometry.py              # LS_Geometry_Proxy add/remove + live contraction
+│   ├── ls_materials.py             # LS_Doppler_<name> clones + live colour shift
+│   ├── ls_searchlight.py           # per-target relativistic-beaming intensity
+│   ├── ls_terrell.py               # ARTISTIC Terrell-rotation placeholder (not real)
+│   ├── ls_evaluator.py             # update_ls_camera_rig + reset_ls_camera_rig
+│   ├── ls_diagnostics.py           # HUD overlay + cos-theta debug palette
+│   └── ls_ui.py                    # status / dialog / console helpers
+├── res/                            # icons, .res / .str files (reserved)
 ├── README.md
-└── CHANGELOG.md
+├── CHANGELOG.md
+└── LICENSE
 ```
 
 ---
@@ -685,7 +756,7 @@ intended.
 - **Test the math module standalone:**
 
   ```
-  cd C4D_ls-cam
+  cd C4D_ls-cam/modules
   python3 ls_relativity_math.py
   ```
 

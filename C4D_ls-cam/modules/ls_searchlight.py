@@ -50,7 +50,7 @@ that have already been opted into the rig system.
 import c4d
 
 import ls_constants as K
-import ls_doppler_materials
+import ls_materials
 import ls_geometry
 import ls_relativity_math as RM
 import ls_ui
@@ -86,7 +86,7 @@ _OCTANE_PLACEHOLDER_LOGGED = False
 
 
 # ---------------------------------------------------------------------------
-# Iterators (mirror ls_doppler_materials but local to this module so the
+# Iterators (mirror ls_materials but local to this module so the
 # searchlight pass doesn't pull in private helpers).
 # ---------------------------------------------------------------------------
 
@@ -118,7 +118,7 @@ def _iter_materials(doc):
 
 def _iter_doppler_duplicates(doc):
     for m in _iter_materials(doc):
-        if ls_doppler_materials.is_doppler_duplicate(m):
+        if ls_materials.is_doppler_duplicate(m):
             yield m
 
 
@@ -191,7 +191,7 @@ def _gather_controlled_objects(doc):
 
 
 # ---------------------------------------------------------------------------
-# Velocity-axis resolution (mirrors ls_doppler_materials)
+# Velocity-axis resolution (mirrors ls_materials)
 # ---------------------------------------------------------------------------
 
 def _resolve_forward_and_pos(controller, camera):

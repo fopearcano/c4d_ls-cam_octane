@@ -150,7 +150,7 @@ def find_existing_proxy(doc):
 # Velocity axis + matrix helpers
 # ---------------------------------------------------------------------------
 
-# Public aliases -- other modules (e.g. ls_doppler_materials) import these.
+# Public aliases -- other modules (e.g. ls_materials) import these.
 def camera_forward_vector(camera):
     """Public alias for :func:`_camera_forward`."""
     return _camera_forward(camera)

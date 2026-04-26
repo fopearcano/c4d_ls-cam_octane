@@ -8,18 +8,32 @@ Drop this folder into one of:
     <user>/maxon/<C4D version>/python/libs/         (per-user)
     <C4D install dir>/plugins/                      (system-wide)
 
-Cinema 4D auto-loads any .pyp file inside ``plugins/`` on startup. This file
-registers a single ``CommandData`` plugin titled "Create LS Relativistic
-Camera Rig" under the **Extensions** menu. The actual rig construction lives
-in ``ls_rig.py`` so the entry point stays small and easy to audit.
+Cinema 4D auto-loads any .pyp file inside ``plugins/`` on startup. This
+file registers every ``CommandData`` plugin under the **Extensions**
+menu. The implementation modules live in the sibling ``modules/``
+subfolder so the ``.pyp`` entry point stays small and easy to audit.
 
-Module layout
--------------
-    c4d_ls_cam.pyp     -- this file; CommandData registration
-    ls_constants.py    -- IDs, names, user-data definitions
-    ls_rig.py          -- rig builder (camera, null, controller tag, UD)
-    ls_octane.py       -- Octane integration placeholder
-    ls_ui.py           -- console / dialog helpers
+Distribution layout
+-------------------
+    C4D_ls-cam/
+      c4d_ls_cam.pyp     -- this file; only does sys.path + registration
+      modules/
+        ls_constants.py        -- IDs, names, user-data + tuning constants
+        ls_rig.py              -- rig builder + remove_rig + find_rig_in_document
+        ls_relativity_math.py  -- pure-Python physical helpers (no c4d import)
+        ls_octane.py           -- Octane discovery / attach / dump
+        ls_octane_params.py    -- symbolic Octane camera-tag param table
+        ls_presets.py          -- A Slower Speed of Light preset table
+        ls_geometry.py         -- LS_Geometry_Proxy add/remove + contraction
+        ls_materials.py        -- LS_Doppler_<name> clones + colour shift
+        ls_searchlight.py      -- per-target relativistic-beaming intensity
+        ls_terrell.py          -- ARTISTIC Terrell-rotation placeholder
+        ls_evaluator.py        -- update_ls_camera_rig + reset_ls_camera_rig
+        ls_diagnostics.py      -- HUD overlay + cos-theta debug palette
+        ls_ui.py               -- status / dialog / console helpers
+      README.md
+      CHANGELOG.md
+      LICENSE
 """
 
 import os
@@ -33,16 +47,21 @@ import c4d
 # Make sibling modules importable.
 # ---------------------------------------------------------------------------
 # C4D loads .pyp files as standalone scripts (not as a package), so we
-# prepend our own directory to sys.path before importing siblings.
+# prepend the modules/ subfolder to sys.path before importing the
+# implementation modules. Falling back to the plugin root keeps the
+# .pyp working in legacy installs where modules might still live next
+# to it -- harmless when the directory doesn't exist.
 _PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
-if _PLUGIN_DIR not in sys.path:
-    sys.path.insert(0, _PLUGIN_DIR)
+_MODULES_DIR = os.path.join(_PLUGIN_DIR, "modules")
+for _path in (_MODULES_DIR, _PLUGIN_DIR):
+    if os.path.isdir(_path) and _path not in sys.path:
+        sys.path.insert(0, _path)
 
 import ls_constants as K  # noqa: E402  -- must follow sys.path tweak
 import ls_rig             # noqa: E402
 import ls_ui              # noqa: E402
 import ls_geometry        # noqa: E402
-import ls_doppler_materials  # noqa: E402
+import ls_materials  # noqa: E402
 import ls_evaluator       # noqa: E402
 import ls_presets         # noqa: E402
 import ls_diagnostics     # noqa: E402
@@ -150,7 +169,7 @@ def _doc_has_doppler_duplicates(doc):
         return False
     m = doc.GetFirstMaterial()
     while m is not None:
-        if ls_doppler_materials.is_doppler_duplicate(m):
+        if ls_materials.is_doppler_duplicate(m):
             return True
         m = m.GetNext()
     return False
@@ -166,7 +185,7 @@ class AddDopplerMaterialController(c4d.plugins.CommandData):
             ls_ui.error("No active document.")
             return False
         try:
-            ls_doppler_materials.add_doppler_controller(doc)
+            ls_materials.add_doppler_controller(doc)
         except Exception as exc:
             traceback.print_exc()
             ls_ui.error("Add Doppler Material Controller failed:\n\n{0}".format(exc))
@@ -253,7 +272,7 @@ class RestoreOriginalMaterials(c4d.plugins.CommandData):
             ls_ui.error("No active document.")
             return False
         try:
-            ls_doppler_materials.restore_original_materials(doc)
+            ls_materials.restore_original_materials(doc)
         except Exception as exc:
             traceback.print_exc()
             ls_ui.error("Restore Original Materials failed:\n\n{0}".format(exc))
@@ -476,6 +495,8 @@ def _register_one(plugin_id, name, help_text, dat):
 
 def _register():
     """Register every CommandData plugin shipped by C4D_ls-cam."""
+    print("[C4D_ls-cam] {0} v{1} loading...".format(
+        K.PLUGIN_NAME, K.PLUGIN_VERSION))
     _register_one(K.PLUGIN_ID, K.COMMAND_NAME, K.COMMAND_HELP,
                   CreateLSRelativisticCameraRig())
     _register_one(K.PLUGIN_ID_GEOM_PROXY_ADD, K.GEOM_PROXY_ADD_NAME,

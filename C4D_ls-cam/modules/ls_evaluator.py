@@ -51,7 +51,7 @@ import ls_relativity_math as RM
 import ls_octane
 import ls_octane_params as OP
 import ls_geometry
-import ls_doppler_materials
+import ls_materials
 import ls_searchlight
 import ls_diagnostics
 import ls_terrell
@@ -544,7 +544,7 @@ def update_ls_camera_rig(doc, controller, camera):
 
     # ---- effect 4b: Doppler colour shift on duplicate materials ----------
     # The duplicates themselves are created/removed via the menu commands
-    # in ls_doppler_materials.py; this call only paints them every tick.
+    # in ls_materials.py; this call only paints them every tick.
     # When the Doppler flag is off we snap the duplicates back to their
     # baseline colour so toggling the flag is fully reversible without
     # having to rebuild any duplicates.
@@ -554,7 +554,7 @@ def update_ls_camera_rig(doc, controller, camera):
     if enable_doppler:
         # effect_strength compounds with the per-effect strength so a
         # single master slider can dim everything at once.
-        ls_doppler_materials.apply_doppler_color_shift(
+        ls_materials.apply_doppler_color_shift(
             doc=doc,
             controller=controller,
             camera=camera,
@@ -562,7 +562,7 @@ def update_ls_camera_rig(doc, controller, camera):
             strength=doppler_color_strength * strength,
         )
     else:
-        ls_doppler_materials.restore_baseline_colors(doc)
+        ls_materials.restore_baseline_colors(doc)
 
     # ---- effect 4c: Searchlight per-target intensity --------------------
     # The scalar searchlight_mult above is just a single forward-direction
@@ -769,7 +769,7 @@ def reset_ls_camera_rig(doc, controller, camera):
     # the explicit "LS Cam: Restore Original Materials" command. Reset
     # just paints the duplicates with their baseline RGB so the viewport
     # looks as it did before any beta sweep.
-    ls_doppler_materials.restore_baseline_colors(doc)
+    ls_materials.restore_baseline_colors(doc)
 
     # ---- restore searchlight baselines ------------------------------------
     # Both viewport and material-luminance modes leave private BC slots

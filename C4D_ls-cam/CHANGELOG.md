@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha] -- 2026-04-26
+
+First publishable drop. Every approximation listed below is in place
+and reversible; the API and scene-graph layout may still change between
+alpha drops.
+
+### Distribution
+- Repackaged for distribution: implementation modules moved into
+  `modules/`, `c4d_ls_cam.pyp` updated to prepend `modules/` to
+  `sys.path` (with a fallback to the plugin root for legacy installs).
+- `ls_doppler_materials.py` renamed to `ls_materials.py` (the brief's
+  distribution layout uses the shorter name); every import + comment
+  reference updated. `ls_evaluator.py` and `ls_diagnostics.py` are
+  also shipped under `modules/` even though they weren't enumerated
+  in the brief's layout list -- both are essential.
+- `__version__ = "0.1.0-alpha"` + `PLUGIN_VERSION` + `PLUGIN_DESCRIPTION`
+  added to `ls_constants.py`. The plugin logs
+  `[C4D_ls-cam] C4D_ls-cam v0.1.0-alpha loading...` on startup.
+- MIT LICENSE shipped at the package root.
+- README rewritten: version banner, requirements, Octane compatibility
+  note, known limitations (true relativistic rendering needs ray-level
+  pass; geometry deformation is approximate; Doppler material shift is
+  approximate; Octane parameter IDs may need local mapping). File
+  layout block updated for the new `modules/` subfolder.
+
 ### Added
 - **Audit pass: dedicated restore + remove commands.**
   - `ls_rig.remove_rig(doc)`: resets the camera/material/proxy/

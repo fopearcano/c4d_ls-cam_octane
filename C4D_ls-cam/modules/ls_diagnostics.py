@@ -40,7 +40,7 @@ Both features are non-destructive:
 import c4d
 
 import ls_constants as K
-import ls_doppler_materials
+import ls_materials
 import ls_geometry
 import ls_ui
 
@@ -255,13 +255,13 @@ def _iter_doppler_duplicates(doc):
         return
     m = doc.GetFirstMaterial()
     while m is not None:
-        if ls_doppler_materials.is_doppler_duplicate(m):
+        if ls_materials.is_doppler_duplicate(m):
             yield m
         m = m.GetNext()
 
 
 def _objects_using_material(doc, mat):
-    """Mirror of the helper in ls_doppler_materials, kept local for isolation."""
+    """Mirror of the helper in ls_materials, kept local for isolation."""
     out = []
     if doc is None:
         return out
