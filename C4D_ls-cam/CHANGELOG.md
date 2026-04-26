@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `ls_octane_params.py`: new module with a symbolic slot table
+  (`OCTANE_CAMERA_PARAMS`) covering depth-of-field, aperture, motion
+  blur, imager exposure, imager saturation, and post-processing
+  bloom/glare. Every slot ships with `param_id: None` -- the integrator
+  fills them in after running the dump helper. Includes
+  `is_param_mapped`, `get_param_id`, `unmapped_keys` helpers.
+- `ls_octane.find_octane_camera_tag_id(force_refresh=False)`: searches
+  registered tag plugins for one whose name contains both `octane` and
+  `camera`. Result is cached at module level.
+- `ls_octane.find_existing_octane_tag(camera)`: returns an Octane Camera
+  Tag already on the camera (so attachment never duplicates).
+- `ls_octane.dump_octane_tag_parameters(tag)` and
+  `ls_octane.dump_octane_tag_on_camera(camera)`: print every Octane
+  camera-tag parameter as `DescID : name = value`, plus a list of
+  symbolic slots in `ls_octane_params` that still need mapping.
+- README "How to map Octane parameter IDs" section walking through the
+  dump-and-paste workflow.
+
+### Changed
+- `ls_octane.add_octane_camera_tag` now takes a
+  `show_dialog_on_failure` flag (default False). When True and
+  attachment fails, surfaces the fixed dialog *"Octane Camera Tag not
+  found. Add it manually, then rerun Update LS Camera Rig."*. Returns
+  the attached / pre-existing `BaseTag` instead of a bool. The rig
+  builder calls it silently so creating a rig in a non-Octane scene is
+  not intrusive.
+
+### Added
 - `ls_evaluator.py`: new module with `update_ls_camera_rig(doc, controller,
   camera)`. Reads the controller's user data, computes
   `gamma`, `contraction_factor`, `doppler_forward_factor`, and
@@ -62,6 +90,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   setting; the value is exposed in the debug log only.
 - `PLUGIN_ID` is a development-only placeholder and must be replaced with
   a Maxon-registered ID before public distribution.
-- `OCTANE_CAMERA_TAG_ID` is `None`; Octane tag attachment is intentionally
-  skipped until the integrator confirms the correct ID.
+- `OCTANE_CAMERA_TAG_ID` is `None` by default; the plugin auto-discovers
+  the Octane Camera Tag by plugin-name search. Override the constant
+  only if discovery picks the wrong plugin.
+- All slots in `ls_octane_params.OCTANE_CAMERA_PARAMS` start with
+  `param_id: None`; downstream code skips unmapped slots until the
+  integrator runs `dump_octane_tag_parameters` and pastes the IDs.
 - No custom icon shipped yet (`icon=None` in registration).

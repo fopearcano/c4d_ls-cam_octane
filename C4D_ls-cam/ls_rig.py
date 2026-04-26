@@ -247,8 +247,13 @@ def build_rig(doc):
         # remain non-destructive.
         _capture_rest_fov(controller_tag, camera)
 
-        # 6. Optional Octane camera tag -- safe no-op if Octane isn't present.
-        ls_octane.add_octane_camera_tag(camera)
+        # 6. Best-effort Octane integration. Discovery + attachment is
+        # silent here: the Attribute Manager dialog only appears when the
+        # user later flips enable_octane_camera_tag and calls into
+        # ls_octane.add_octane_camera_tag(camera, show_dialog_on_failure=True)
+        # from an interactive command. If Octane isn't installed at all,
+        # this just returns None.
+        ls_octane.add_octane_camera_tag(camera, show_dialog_on_failure=False)
 
         # 7. Make the new camera the active selection so the user sees it.
         doc.SetActiveObject(camera, c4d.SELECTION_NEW)

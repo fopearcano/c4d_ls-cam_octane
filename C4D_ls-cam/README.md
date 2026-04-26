@@ -101,26 +101,78 @@ them as read-only:
 
 ## Octane integration
 
-`enable_octane_camera_tag` is wired up in the user data, but the actual tag
-attachment is gated behind a **verified** Octane Camera Tag plugin ID. Octane
-ships different IDs across versions, so we refuse to guess.
+The plugin tries to **discover** the Octane Camera Tag at runtime by
+scanning registered tag plugins for one whose name contains both
+`octane` and `camera` (`ls_octane.find_octane_camera_tag_id`). When
+discovery succeeds, `ls_octane.add_octane_camera_tag(camera)` either
+attaches a fresh tag or returns the existing one if the camera already
+has one — never duplicates.
 
-To finish the wiring:
+If discovery fails:
 
-1. Install Octane for Cinema 4D and load any scene.
-2. Add an Octane Camera Tag to a camera, then select that tag.
-3. In the C4D Python console run:
+* Per-frame paths (the controller's evaluation tag, `build_rig`) stay
+  silent and just skip the Octane step.
+* Interactive paths (call with `show_dialog_on_failure=True`) raise the
+  fixed dialog: *"Octane Camera Tag not found. Add it manually, then
+  rerun Update LS Camera Rig."*
+
+You can also override discovery by setting `OCTANE_CAMERA_TAG_ID` at the
+top of `ls_octane.py` to a known integer plugin ID.
+
+### How to map Octane parameter IDs
+
+Octane's camera-tag parameter IDs are **not version-stable**, so we never
+hardcode them blindly. Instead, `ls_octane_params.py` defines symbolic
+slots (`depth_of_field`, `aperture`, `motion_blur`, `imager_exposure`,
+`imager_saturation`, `postfx_bloom_glare`) with `param_id: None`
+placeholders, and you fill them in once per Octane version:
+
+1. **Install Octane for C4D** and open any scene.
+2. **Add an Octane Camera Tag** to any camera, then select that tag in
+   the Object Manager.
+3. **Open the Python Console** (`Extensions ▸ Console`) and run:
 
    ```python
-   import c4d
-   print(doc.GetActiveTag().GetType())
+   from C4D_ls_cam import ls_octane
+   ls_octane.dump_octane_tag_parameters(doc.GetActiveTag())
    ```
 
-4. Paste the printed integer into `OCTANE_CAMERA_TAG_ID` in
-   `ls_octane.py` (replacing the `None` placeholder).
+   The console prints one line per parameter:
 
-Until then, `add_octane_camera_tag()` is a safe no-op that prints a notice
-to the console.
+   ```
+   [C4D_ls-cam] === Octane tag parameter dump ===
+   [C4D_ls-cam] tag name : Octane Camera Tag
+   [C4D_ls-cam] tag type : 1029524
+   [C4D_ls-cam]   DescID[(1001,19,1029524)] : Aperture = 0.2
+   [C4D_ls-cam]   DescID[(1002,15,1029524)] : Depth Of Field = True
+   ...
+   [C4D_ls-cam] === end dump (N params) ===
+   [C4D_ls-cam] Slots awaiting param_id mapping in
+   ls_octane_params.OCTANE_CAMERA_PARAMS: ['depth_of_field', 'aperture', ...]
+   ```
+
+4. **Find the lines that match the symbolic slots** in
+   `ls_octane_params.OCTANE_CAMERA_PARAMS` and copy each DescID into the
+   matching slot, replacing `None`. The simplest form is just the integer
+   from the first level of the DescID:
+
+   ```python
+   PARAM_APERTURE: {
+       "label": "Aperture",
+       "description": "Lens aperture size; drives bokeh diameter.",
+       "param_id": 1001,   # <-- pasted from the dump
+   },
+   ```
+
+   If you need a multi-level descriptor, paste a `c4d.DescID(...)`
+   directly. Both forms are accepted by downstream code.
+
+5. **Save the file and reload the plugin** (or restart C4D). Mapped
+   slots will then be usable; unmapped slots remain skipped — never
+   guessed.
+
+> Do **not** commit guessed IDs. A wrong ID can silently misroute a
+> value into an unrelated parameter.
 
 ---
 
@@ -132,7 +184,8 @@ C4D_ls-cam/
 ├── ls_constants.py    # IDs, names, user-data definitions
 ├── ls_rig.py          # rig builder (camera, null, tag, user data, undo)
 ├── ls_evaluator.py    # update_ls_camera_rig: drives camera + UD outputs
-├── ls_octane.py       # Octane integration placeholder
+├── ls_octane.py       # Octane discovery / attach / dump
+├── ls_octane_params.py    # symbolic slot table for Octane camera-tag params
 ├── ls_relativity_math.py  # pure-Python relativistic helpers (no c4d import)
 ├── ls_ui.py           # status / dialog / console helpers
 ├── res/               # icons, .res / .str files (reserved)
