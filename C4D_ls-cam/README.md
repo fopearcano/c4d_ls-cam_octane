@@ -25,16 +25,22 @@ Tag on LS_Camera_Rig:
 
 ### User-data parameters on `LS_Relativity_Controller`
 
-| Parameter                  | Type  | Default | Range          |
-|----------------------------|-------|---------|----------------|
-| `beta_velocity`            | float | 0.0     | 0.0 – 0.999    |
-| `speed_of_light_scale`     | float | 1.0     | 0.0001 – 1000  |
-| `effect_strength`          | float | 1.0     | 0.0 – 2.0      |
-| `enable_lorentz_geometry`  | bool  | true    | —              |
-| `enable_doppler_color`     | bool  | true    | —              |
-| `enable_searchlight_effect`| bool  | true    | —              |
-| `enable_octane_camera_tag` | bool  | false   | —              |
-| `debug_mode`               | bool  | false   | —              |
+| Parameter                       | Type  | Default | Range            |
+|---------------------------------|-------|---------|------------------|
+| `beta_velocity`                 | float | 0.0     | 0.0 – 0.999      |
+| `speed_of_light_scale`          | float | 1.0     | 0.0001 – 1000    |
+| `effect_strength`               | float | 1.0     | 0.0 – 2.0        |
+| `fov_mode`                      | enum  | Subtle  | Subtle / Extreme / Scientific-ish |
+| `fov_strength`                  | float | 1.0     | 0.0 – 2.0        |
+| `dof_strength`                  | float | 1.0     | 0.0 – 2.0        |
+| `exposure_strength`             | float | 1.0     | 0.0 – 2.0        |
+| `enable_lorentz_geometry`       | bool  | true    | —                |
+| `enable_doppler_color`          | bool  | true    | —                |
+| `enable_searchlight_effect`     | bool  | true    | —                |
+| `enable_relativistic_dof`       | bool  | false   | —                |
+| `enable_relativistic_exposure`  | bool  | false   | —                |
+| `enable_octane_camera_tag`      | bool  | false   | —                |
+| `debug_mode`                    | bool  | false   | —                |
 
 The whole rig is built in a single undo step — one `Ctrl+Z` removes
 everything the command inserted.
@@ -46,24 +52,54 @@ scene evaluation. They are exposed as user-data so artists can read them
 in the Attribute Manager, but they are overwritten every tick — treat
 them as read-only:
 
-| Output                    | Meaning                                                  |
-|---------------------------|----------------------------------------------------------|
-| `gamma`                   | Lorentz factor `1 / sqrt(1 - β²)`                        |
-| `contraction_factor`      | `sqrt(1 - β²)` (length contraction along motion axis)    |
-| `doppler_forward_factor`  | Doppler `D` for a head-on line of sight                  |
-| `searchlight_multiplier`  | Relativistic-beaming intensity multiplier (`D^4·strength`) |
+| Output                       | Meaning                                                  |
+|------------------------------|----------------------------------------------------------|
+| `gamma`                      | Lorentz factor `1 / sqrt(1 - β²)`                        |
+| `contraction_factor`         | `sqrt(1 - β²)` (length contraction along motion axis)    |
+| `doppler_forward_factor`     | Doppler `D` for a head-on line of sight                  |
+| `searchlight_multiplier`     | Relativistic-beaming intensity multiplier (`D^4·strength`) |
+| `doppler_temperature_shift`  | Δ Kelvin from 6500 K rest temp (positive = bluer; artistic, no material edits) |
 
 ### Camera behavior
 
-* **FOV.** The camera's rest FOV is captured at rig creation and stored
-  on the controller. While `enable_lorentz_geometry` is on, the live FOV
-  is `rest_fov · (1 + 0.5 · β · effect_strength)`. Disabling the flag (or
-  setting beta to 0) restores the rest FOV exactly — the effect is
-  non-destructive.
-* **Motion-blur multiplier.** Computed every tick but not yet routed into
+All camera-side effects are **artistic approximations** unless flagged
+otherwise. Every driven value is reversible: the rig captures the
+camera's rest FOV / focus distance / aperture at creation time, and
+`reset_ls_camera_rig(doc, controller, camera)` restores them exactly.
+
+* **FOV (`enable_lorentz_geometry`).** Multiplier applied to the rest
+  FOV depends on `fov_mode`:
+
+  | Mode             | Formula                                                                                      |
+  |------------------|----------------------------------------------------------------------------------------------|
+  | Subtle           | `1 + 0.3 · β · fov_strength`                                                                 |
+  | Extreme          | `1 + 1.5 · β · fov_strength`                                                                 |
+  | Scientific-ish   | `1 + (sqrt((1-β)/(1+β)) - 1) · fov_strength` — physically-motivated forward narrowing        |
+
+  All three modes apply a uniform FOV multiplier; the real
+  aberration formula skews different angles differently, so even
+  "Scientific-ish" is a preview, not a true raytraced aberration pass.
+* **Depth of field (`enable_relativistic_dof`).** If an Octane Camera
+  Tag is present and the `aperture` / `depth_of_field` slots in
+  `ls_octane_params` are mapped, those are driven from a per-slot
+  baseline captured on first touch. Otherwise the C4D camera's
+  `CAMERAOBJECT_APERTURE` is scaled from its rest baseline by
+  `1 + 1.0 · β · dof_strength`. Wider aperture reads as a shallower
+  focal plane — pure look choice, not a real relativistic effect.
+* **Exposure / searchlight (`enable_relativistic_exposure`).** Imager
+  exposure is scaled by `D^(4·exposure_strength)` from baseline when
+  the Octane `imager_exposure` slot is mapped. Imager saturation is
+  reduced and post-FX bloom/glare is increased for added beam-y
+  glow. If Octane mapping is unavailable, the multiplier is computed
+  but not written anywhere — the C4D standard camera has no unified
+  exposure field, so we'd be poking renderer-specific knobs that are
+  out of scope for this pass.
+* **Color perception.** `doppler_temperature_shift` (in Kelvin) is
+  computed every tick from the forward Doppler factor and exposed as
+  a read-only output. **Materials are not modified** at this stage.
+* **Motion-blur multiplier.** Computed every tick but not routed into
   any render engine's settings; visible in the debug log only.
-* **Geometry / materials.** Not deformed or modified at this stage.
-* **Octane.** Not required at this stage.
+* **Geometry.** Not deformed.
 
 ---
 

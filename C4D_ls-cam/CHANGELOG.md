@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Camera-level relativistic effects in `ls_evaluator`:
+  - **FOV mode enum** (`fov_mode`: Subtle / Extreme / Scientific-ish)
+    with `fov_strength`. Subtle and Extreme are linear widenings;
+    Scientific-ish uses the physically-motivated `sqrt((1-β)/(1+β))`
+    forward narrowing applied as a uniform FOV multiplier (artistic
+    approximation -- the real aberration skews angles differently).
+  - **Relativistic DoF** (`enable_relativistic_dof`, `dof_strength`).
+    Drives Octane `aperture` / `depth_of_field` slots when they are
+    mapped in `ls_octane_params`; otherwise scales the C4D camera's
+    `CAMERAOBJECT_APERTURE` from its rest baseline.
+  - **Relativistic exposure** (`enable_relativistic_exposure`,
+    `exposure_strength`). When Octane imager slots are mapped, scales
+    `imager_exposure`, drops `imager_saturation`, and boosts
+    `postfx_bloom_glare` from per-slot baselines. With no Octane
+    mapping the multiplier is computed but not written (the C4D
+    standard camera has no unified exposure field).
+  - **Color-perception output** `doppler_temperature_shift` (Kelvin
+    delta from a 6500 K rest temperature, positive = bluer). Materials
+    are NOT modified at this stage per the spec.
+- `reset_ls_camera_rig(doc, controller, camera)`: restores camera FOV
+  / focus distance / aperture from the captured baselines, restores
+  every mapped Octane parameter from its per-slot
+  `_baseline_octane_<slot>` field on the controller, and clears the
+  computed-output user-data fields back to their identity values.
+  Idempotent and tolerant of missing baselines.
+- Per-Octane-slot baselines are captured lazily on first write into
+  hidden-style `_baseline_octane_<slot>` user-data fields on the
+  controller, persisted with the scene file so reset works after
+  reopen.
+- C4D camera baselines (`_rest_focus_dist`, `_rest_aperture`)
+  captured at rig creation alongside the existing `_rest_fov_rad`.
 - `ls_octane_params.py`: new module with a symbolic slot table
   (`OCTANE_CAMERA_PARAMS`) covering depth-of-field, aperture, motion
   blur, imager exposure, imager saturation, and post-processing
@@ -82,12 +113,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - README with installation instructions and module layout.
 
 ### Known limitations
-- Geometry deformation (Lorentz contraction applied to scene meshes) is
-  not implemented yet -- the FOV update is the only camera-side effect
-  currently driven by `beta_velocity`.
-- Material / shader updates (Doppler color shift) are not implemented yet.
+- Geometry deformation (Lorentz contraction applied to scene meshes)
+  is still not implemented.
+- Material / shader updates (Doppler color shift on assets) are not
+  implemented; only the global `doppler_temperature_shift` output is
+  exposed.
+- Exposure path needs Octane parameter mapping to actually drive
+  anything -- with no mapping the multiplier is computed only.
 - Motion-blur multiplier is computed but not written to any render
   setting; the value is exposed in the debug log only.
+- All three FOV modes apply a single uniform multiplier; even
+  "Scientific-ish" is not a true raytraced aberration pass.
 - `PLUGIN_ID` is a development-only placeholder and must be replaced with
   a Maxon-registered ID before public distribution.
 - `OCTANE_CAMERA_TAG_ID` is `None` by default; the plugin auto-discovers

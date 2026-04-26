@@ -39,11 +39,22 @@ CONTROLLER_TAG_NAME = "LS_Relativity_Controller"
 
 UD_BETA_VELOCITY = "beta_velocity"
 UD_SOL_SCALE = "speed_of_light_scale"
+UD_EFFECT_STRENGTH = "effect_strength"
+
+# FOV controls (added in the camera-effects pass).
+UD_FOV_MODE = "fov_mode"
+UD_FOV_STRENGTH = "fov_strength"
+
+# Per-effect toggles + per-effect strengths.
 UD_ENABLE_LORENTZ = "enable_lorentz_geometry"
 UD_ENABLE_DOPPLER = "enable_doppler_color"
 UD_ENABLE_SEARCHLIGHT = "enable_searchlight_effect"
+UD_ENABLE_DOF = "enable_relativistic_dof"
+UD_ENABLE_EXPOSURE = "enable_relativistic_exposure"
 UD_ENABLE_OCTANE_TAG = "enable_octane_camera_tag"
-UD_EFFECT_STRENGTH = "effect_strength"
+UD_DOF_STRENGTH = "dof_strength"
+UD_EXPOSURE_STRENGTH = "exposure_strength"
+
 UD_DEBUG_MODE = "debug_mode"
 
 # ---- Computed (read-only) outputs --------------------------------------------
@@ -55,12 +66,18 @@ UD_OUT_GAMMA = "gamma"
 UD_OUT_CONTRACTION = "contraction_factor"
 UD_OUT_DOPPLER_FWD = "doppler_forward_factor"
 UD_OUT_SEARCHLIGHT = "searchlight_multiplier"
+# Doppler-driven color-temperature shift in Kelvin (delta from rest temp).
+# Positive = bluer (approach), negative = redder (recession).
+UD_OUT_DOPPLER_TEMP_SHIFT = "doppler_temperature_shift"
 
-# ---- Internal cache ---------------------------------------------------------
-# The camera's FOV at rig-creation time. We capture this so FOV updates
-# stay non-destructive: the live FOV is always derived from this stored
-# baseline rather than from the previous frame's value (which would drift).
+# ---- Internal caches --------------------------------------------------------
+# Original camera state captured at rig creation. Every camera-side
+# effect derives its live value from these baselines, so toggling an
+# effect off (or calling reset_ls_camera_rig) restores the camera to
+# exactly its initial state.
 UD_REST_FOV_RAD = "_rest_fov_rad"
+UD_REST_FOCUS_DIST = "_rest_focus_dist"
+UD_REST_APERTURE = "_rest_aperture"
 
 # Set of UD keys that are computed outputs (used by the evaluator and the
 # UI to label them as read-only).
@@ -69,23 +86,57 @@ UD_OUTPUT_KEYS = (
     UD_OUT_CONTRACTION,
     UD_OUT_DOPPLER_FWD,
     UD_OUT_SEARCHLIGHT,
+    UD_OUT_DOPPLER_TEMP_SHIFT,
 )
+
+# ---- FOV mode enum ---------------------------------------------------------
+# fov_mode is a CYCLE / DTYPE_LONG user-data field; the integer value
+# stored in the field maps to one of these mode constants.
+FOV_MODE_SUBTLE = 0
+FOV_MODE_EXTREME = 1
+FOV_MODE_SCIENTIFIC = 2
+
+# Items shown in the cycle dropdown, indexed by the mode constants above.
+FOV_MODE_ITEMS = ("Subtle", "Extreme", "Scientific-ish")
+
+# Coefficients for the "Subtle" and "Extreme" artistic modes; the
+# "Scientific-ish" mode uses sqrt((1-beta)/(1+beta)) directly and is not
+# parameterised here. Tunable in one place if the art direction shifts.
+FOV_MODE_SUBTLE_COEFF = 0.3   # FOV mult = 1 + COEFF * beta * fov_strength
+FOV_MODE_EXTREME_COEFF = 1.5
+
+# ---- Doppler color temperature ---------------------------------------------
+# A blackbody peak shifts as T_obs = T_emit * D (Wien's law inverted).
+# We need a reference rest temperature to express the shift as a delta.
+# 6500 K matches the "neutral daylight" white point used in most colour
+# pipelines and gives intuitive numbers (positive = bluer, negative =
+# redder). Pure artistic choice -- spectral renderers should ignore.
+COLOR_TEMP_REST_K = 6500.0
 
 # Human-readable labels shown in the Attribute Manager.
 UD_LABELS = {
     UD_BETA_VELOCITY: "Beta Velocity (v/c)",
     UD_SOL_SCALE: "Speed of Light Scale",
+    UD_EFFECT_STRENGTH: "Effect Strength",
+    UD_FOV_MODE: "FOV Mode",
+    UD_FOV_STRENGTH: "FOV Strength",
     UD_ENABLE_LORENTZ: "Enable Lorentz Geometry",
     UD_ENABLE_DOPPLER: "Enable Doppler Color",
     UD_ENABLE_SEARCHLIGHT: "Enable Searchlight Effect",
+    UD_ENABLE_DOF: "Enable Relativistic DoF",
+    UD_ENABLE_EXPOSURE: "Enable Relativistic Exposure",
     UD_ENABLE_OCTANE_TAG: "Enable Octane Camera Tag",
-    UD_EFFECT_STRENGTH: "Effect Strength",
+    UD_DOF_STRENGTH: "DoF Strength",
+    UD_EXPOSURE_STRENGTH: "Exposure Strength",
     UD_DEBUG_MODE: "Debug Mode",
     UD_OUT_GAMMA: "Gamma (computed)",
     UD_OUT_CONTRACTION: "Contraction Factor (computed)",
     UD_OUT_DOPPLER_FWD: "Doppler Forward Factor (computed)",
     UD_OUT_SEARCHLIGHT: "Searchlight Multiplier (computed)",
-    UD_REST_FOV_RAD: "Rest FOV (rad, internal)",
+    UD_OUT_DOPPLER_TEMP_SHIFT: "Doppler Temperature Shift K (computed)",
+    UD_REST_FOV_RAD: "Rest FOV rad (internal)",
+    UD_REST_FOCUS_DIST: "Rest Focus Distance (internal)",
+    UD_REST_APERTURE: "Rest Aperture (internal)",
 }
 
 # Default values + ranges for the numeric user-data fields.
@@ -94,6 +145,18 @@ UD_RANGES = {
     UD_BETA_VELOCITY: (0.0, 0.999, 0.0),
     UD_SOL_SCALE: (0.0001, 1000.0, 1.0),
     UD_EFFECT_STRENGTH: (0.0, 2.0, 1.0),
+    UD_FOV_STRENGTH: (0.0, 2.0, 1.0),
+    UD_DOF_STRENGTH: (0.0, 2.0, 1.0),
+    UD_EXPOSURE_STRENGTH: (0.0, 2.0, 1.0),
+}
+
+# Enum (cycle) fields. ``items`` is the ordered list of dropdown entries;
+# the integer stored in the field is the selected index.
+UD_ENUMS = {
+    UD_FOV_MODE: {
+        "items": FOV_MODE_ITEMS,
+        "default": FOV_MODE_SUBTLE,
+    },
 }
 
 # Generous display ranges for the read-only numeric outputs. The slider
@@ -104,7 +167,10 @@ UD_OUTPUT_RANGES = {
     UD_OUT_CONTRACTION: (0.0, 1.0, 1.0),
     UD_OUT_DOPPLER_FWD: (0.0, 1000.0, 1.0),
     UD_OUT_SEARCHLIGHT: (0.0, 1.0e9, 1.0),
+    UD_OUT_DOPPLER_TEMP_SHIFT: (-50000.0, 50000.0, 0.0),
     UD_REST_FOV_RAD: (0.0, 6.283185307, 0.0),
+    UD_REST_FOCUS_DIST: (0.0, 1.0e9, 0.0),
+    UD_REST_APERTURE: (0.0, 1.0e6, 0.0),
 }
 
 # Default values for the bool fields.
@@ -112,27 +178,40 @@ UD_BOOL_DEFAULTS = {
     UD_ENABLE_LORENTZ: True,
     UD_ENABLE_DOPPLER: True,
     UD_ENABLE_SEARCHLIGHT: True,
+    UD_ENABLE_DOF: False,
+    UD_ENABLE_EXPOSURE: False,
     UD_ENABLE_OCTANE_TAG: False,
     UD_DEBUG_MODE: False,
 }
 
 # Ordered list driving the order of fields in the Attribute Manager.
 UD_ORDER = [
+    # Inputs.
     UD_BETA_VELOCITY,
     UD_SOL_SCALE,
     UD_EFFECT_STRENGTH,
+    UD_FOV_MODE,
+    UD_FOV_STRENGTH,
+    UD_DOF_STRENGTH,
+    UD_EXPOSURE_STRENGTH,
+    # Effect toggles.
     UD_ENABLE_LORENTZ,
     UD_ENABLE_DOPPLER,
     UD_ENABLE_SEARCHLIGHT,
+    UD_ENABLE_DOF,
+    UD_ENABLE_EXPOSURE,
     UD_ENABLE_OCTANE_TAG,
     UD_DEBUG_MODE,
-    # Computed (read-only) outputs follow.
+    # Computed (read-only) outputs.
     UD_OUT_GAMMA,
     UD_OUT_CONTRACTION,
     UD_OUT_DOPPLER_FWD,
     UD_OUT_SEARCHLIGHT,
-    # Internal cache -- last so it's least visible.
+    UD_OUT_DOPPLER_TEMP_SHIFT,
+    # Internal caches -- last so they're least visible in the AM.
     UD_REST_FOV_RAD,
+    UD_REST_FOCUS_DIST,
+    UD_REST_APERTURE,
 ]
 
 # ---------------------------------------------------------------------------
@@ -142,6 +221,18 @@ UD_ORDER = [
 # the live camera FOV and the motion-blur multiplier. Tuned for "feels
 # right at beta ~ 0.9", not for spectral accuracy. Adjust here, not in
 # the evaluator, so the math stays grouped with the rest of the constants.
-FOV_BETA_COEFF = 0.5          # FOV multiplier = 1 + FOV_BETA_COEFF * beta * strength
+FOV_BETA_COEFF = 0.5          # legacy fallback when fov_mode field is missing
 MOTION_BLUR_BETA_COEFF = 1.0  # blur multiplier = 1 + MOTION_BLUR_BETA_COEFF * beta * strength
+
+# DoF tuning (artistic). C4D camera path multiplies the rest aperture by
+# (1 + DOF_BETA_COEFF * beta * dof_strength). Octane path multiplies its
+# baseline aperture similarly. Wider aperture -> shallower DoF, which
+# reads as "subjective time slowing on the focal plane" at high speed.
+DOF_BETA_COEFF = 1.0
+
+# Exposure tuning (artistic). When the relativistic exposure flag is on,
+# we scale the imager exposure by D^(EXPOSURE_BETA_EXPONENT * strength)
+# where D is the forward Doppler factor. The exponent governs how
+# aggressively forward beaming brightens the image.
+EXPOSURE_BETA_EXPONENT = 4.0
 

@@ -55,6 +55,29 @@ def _add_bool_ud(host, name, default):
     return desc_id
 
 
+def _add_enum_ud(host, name, items, default_index):
+    """
+    Add a CYCLE (dropdown) user-data field to *host* and return its DescID.
+
+    *items* is the ordered tuple of label strings. The integer stored in
+    the field is the selected index into that tuple.
+    """
+    bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+    bc[c4d.DESC_NAME] = name
+    bc[c4d.DESC_SHORT_NAME] = name
+    bc[c4d.DESC_DEFAULT] = int(default_index)
+    bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+
+    cycle = c4d.BaseContainer()
+    for i, label in enumerate(items):
+        cycle.SetString(i, label)
+    bc[c4d.DESC_CYCLE] = cycle
+
+    desc_id = host.AddUserData(bc)
+    host[desc_id] = int(default_index)
+    return desc_id
+
+
 def _build_user_data(tag):
     """
     Attach all user-data parameters defined in ls_constants to *tag*.
@@ -75,7 +98,10 @@ def _build_user_data(tag):
     for key in K.UD_ORDER:
         label = K.UD_LABELS[key]
 
-        if key in K.UD_RANGES:
+        if key in K.UD_ENUMS:
+            spec = K.UD_ENUMS[key]
+            ud_ids[key] = _add_enum_ud(tag, label, spec["items"], spec["default"])
+        elif key in K.UD_RANGES:
             vmin, vmax, default = K.UD_RANGES[key]
             ud_ids[key] = _add_real_ud(tag, label, default, vmin, vmax)
         elif key in K.UD_OUTPUT_RANGES:
@@ -93,25 +119,62 @@ def _build_user_data(tag):
     return ud_ids
 
 
-def _capture_rest_fov(tag, camera):
+def _capture_rest_camera_state(tag, camera):
     """
-    Store the camera's current FOV on the controller tag.
+    Snapshot the camera's current FOV / focus distance / aperture onto
+    the controller tag.
 
-    The evaluator derives the live FOV from this baseline every tick, so
-    capturing it once at rig-creation keeps the effect non-destructive: if
-    the user disables ``enable_lorentz_geometry`` (or sets beta to 0) the
-    camera returns to exactly its starting FOV.
+    Every camera-side effect derives its live value from these baselines,
+    so toggling an effect off (or calling ``reset_ls_camera_rig``)
+    restores the camera to exactly its initial state. Capturing once at
+    rig creation -- rather than reading the camera every tick -- means
+    the baseline never drifts even if the evaluator is wedged into a
+    feedback loop.
+
+    Defensive against missing fields and against parameters the camera
+    type may not expose (some properties are gated on the active
+    renderer). Each field is captured independently so a single missing
+    parameter never blocks the others.
     """
-    fov_id = None
+    # Build a label -> DescID lookup for the controller's user data.
+    lookup = {}
     for desc_id, bc in tag.GetUserDataContainer():
-        if bc[c4d.DESC_NAME] == K.UD_LABELS[K.UD_REST_FOV_RAD]:
-            fov_id = desc_id
-            break
-    if fov_id is None:
-        # Should be impossible: _build_user_data inserts every UD_ORDER key.
-        return
-    rest_fov = float(camera[c4d.CAMERAOBJECT_FOV])
-    tag[fov_id] = rest_fov
+        lookup[bc[c4d.DESC_NAME]] = desc_id
+
+    def _store(label, value):
+        desc_id = lookup.get(label)
+        if desc_id is None:
+            return
+        try:
+            tag[desc_id] = float(value)
+        except Exception:
+            pass
+
+    # FOV is always present on a standard camera.
+    try:
+        _store(K.UD_LABELS[K.UD_REST_FOV_RAD], camera[c4d.CAMERAOBJECT_FOV])
+    except Exception:
+        pass
+
+    # Focus distance: TARGETDISTANCE on the standard camera. May be 0
+    # if the user hasn't set it -- still safe to record.
+    try:
+        _store(K.UD_LABELS[K.UD_REST_FOCUS_DIST],
+               camera[c4d.CAMERAOBJECT_TARGETDISTANCE])
+    except Exception:
+        pass
+
+    # Aperture: APERTURE on the standard camera. Some camera variants
+    # (and some renderer presets) hide this; tolerate absence.
+    try:
+        _store(K.UD_LABELS[K.UD_REST_APERTURE],
+               camera[c4d.CAMERAOBJECT_APERTURE])
+    except Exception:
+        pass
+
+
+# Backwards-compatible alias -- earlier passes called this helper.
+_capture_rest_fov = _capture_rest_camera_state
 
 
 # ---------------------------------------------------------------------------
@@ -242,10 +305,11 @@ def build_rig(doc):
         doc.AddUndo(c4d.UNDOTYPE_NEW, controller_tag)
         ud_ids = _build_user_data(controller_tag)
 
-        # 5. Capture the camera's rest FOV onto the controller. The
-        # evaluator derives every live FOV from this baseline so changes
-        # remain non-destructive.
-        _capture_rest_fov(controller_tag, camera)
+        # 5. Capture the camera's rest state (FOV, focus distance,
+        # aperture) onto the controller. The evaluator derives every
+        # live value from these baselines so changes remain
+        # non-destructive and reset_ls_camera_rig() can restore them.
+        _capture_rest_camera_state(controller_tag, camera)
 
         # 6. Best-effort Octane integration. Discovery + attachment is
         # silent here: the Attribute Manager dialog only appears when the
