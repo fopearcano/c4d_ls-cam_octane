@@ -106,6 +106,7 @@ C4D_ls-cam/
 ├── ls_constants.py    # IDs, names, user-data definitions
 ├── ls_rig.py          # rig builder (camera, null, tag, user data, undo)
 ├── ls_octane.py       # Octane integration placeholder
+├── ls_relativity_math.py  # pure-Python relativistic helpers (no c4d import)
 ├── ls_ui.py           # status / dialog / console helpers
 ├── res/               # icons, .res / .str files (reserved)
 ├── README.md
@@ -121,3 +122,12 @@ C4D_ls-cam/
   Plugins` (or restart C4D).
 - **Console:** `Extensions ▸ Console` shows the registration message and any
   tracebacks emitted by `Execute()`.
+- **Test the math module standalone:**
+
+  ```
+  cd C4D_ls-cam
+  python3 ls_relativity_math.py
+  ```
+
+  Prints `ls_relativity_math: all self-tests passed.` on success. The
+  module imports only the standard library, so it runs in any Python 3.

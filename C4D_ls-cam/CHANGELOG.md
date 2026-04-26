@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `ls_relativity_math.py`: pure-Python helpers (no C4D dependency) for
+  special-relativistic visual effects -- `clamp_beta`, `gamma_from_beta`,
+  `lorentz_contraction_factor`, `doppler_factor`,
+  `relativistic_aberration_cos`, `searchlight_intensity_factor`, and
+  `wavelength_shift_rgb_approx`. Includes a `__main__` self-test block
+  runnable outside Cinema 4D.
 - Initial plugin skeleton for Cinema 4D 2025+ Python SDK.
 - `CommandData` plugin **Create LS Relativistic Camera Rig** registered
   under the Extensions menu.
