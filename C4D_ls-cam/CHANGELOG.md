@@ -8,6 +8,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Advanced (Terrell placeholder + ray-level future-work block)**
+  in `ls_terrell.py`:
+  - `apply_terrell_placeholder(proxy_object, camera, beta,
+    strength)`: stamps the proxy's current REL_ROTATION into a
+    private BC slot once, then writes
+    `baseline + asin(|β|) * strength * sign(β)` onto the heading
+    (Y) channel. Pitch + bank stay at baseline so the contraction
+    axis the geometry pass set up on local Z is preserved. β is
+    clamped to ±0.999 before `asin` so the angle approaches but
+    never reaches ±π/2. Returns the angle actually written.
+  - `restore_terrell(proxy_object)`: writes the baseline back and
+    clears the marker so a subsequent re-enable re-captures from
+    the current state. Cheap when there is no marker.
+  - Camera arg is reserved for future ray-level work; the
+    placeholder ignores it and rotates around the proxy's local Y.
+  - Module is intentionally separate from `ls_relativity_math`
+    (which holds physically motivated approximations). Module
+    docstring + a TODO comment block describe what a real ray-
+    level Terrell implementation would need.
+- New controller user-data fields: `enable_terrell_placeholder`
+  (bool, default False), `terrell_strength` (float 0..2, default
+  1), and `ray_level_warning` (string, default = the warning text
+  required by the brief: "This is an artistic approximation. True
+  Terrell rotation requires ray-level rendering or custom
+  shader/camera implementation."). All three live in an "Advanced:"
+  group via label prefixes so they are visually separated from the
+  physical-approximation fields.
+- `ls_rig._add_string_ud` helper + `UD_STRINGS` table in
+  `ls_constants` for STRING-typed UD fields with default text.
+
+### Changed
+- `ls_evaluator.update_ls_camera_rig`:
+  - Reads `enable_terrell_placeholder` + `terrell_strength` and
+    calls `ls_terrell.apply_terrell_placeholder(proxy, camera,
+    beta, terrell_strength * effect_strength)` when on,
+    `ls_terrell.restore_terrell(proxy)` when off. The placeholder
+    runs after the geometry contraction pass so it composes on top.
+  - `reset_ls_camera_rig` now also calls `ls_terrell.restore_terrell`.
+
+### Notes
+- The placeholder is **strictly artistic**. Real Terrell rotation
+  requires per-ray retarded-time sampling and lives at the render-
+  engine / shader level, not in this evaluator. The module is named
+  with the `_terrell` suffix specifically so a future
+  `ls_terrell_ray.py` (or shader file) is the obvious place for the
+  real implementation when that work happens.
+
+### Added
 - **Diagnostic helpers** in `ls_diagnostics.py`:
   - HUD overlay built from a single `LS_Diagnostic_Overlay` null
     parented under the LS camera. Five `Osplinetext` rows show

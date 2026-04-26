@@ -67,6 +67,23 @@ def _add_vector_ud(host, name, default_xyz):
     return desc_id
 
 
+def _add_string_ud(host, name, default):
+    """
+    Add a STRING user-data field to *host* and return its DescID.
+
+    Used for the read-only "ray_level_warning" field. C4D has no native
+    read-only flag for user data, so the field is technically editable;
+    the rig never re-reads it, so user edits are inert.
+    """
+    bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_STRING)
+    bc[c4d.DESC_NAME] = name
+    bc[c4d.DESC_SHORT_NAME] = name
+    bc[c4d.DESC_DEFAULT] = str(default)
+    desc_id = host.AddUserData(bc)
+    host[desc_id] = str(default)
+    return desc_id
+
+
 def _add_enum_ud(host, name, items, default_index):
     """
     Add a CYCLE (dropdown) user-data field to *host* and return its DescID.
@@ -116,6 +133,8 @@ def _build_user_data(tag):
         elif key in K.UD_VECTORS:
             (default_xyz,) = K.UD_VECTORS[key]
             ud_ids[key] = _add_vector_ud(tag, label, default_xyz)
+        elif key in K.UD_STRINGS:
+            ud_ids[key] = _add_string_ud(tag, label, K.UD_STRINGS[key])
         elif key in K.UD_RANGES:
             vmin, vmax, default = K.UD_RANGES[key]
             ud_ids[key] = _add_real_ud(tag, label, default, vmin, vmax)

@@ -42,6 +42,9 @@ Tag on LS_Camera_Rig:
 | `enable_octane_camera_tag`      | bool  | false   | —                |
 | `debug_mode`                    | bool  | false   | —                |
 | `debug_material_preview`        | bool  | false   | —                |
+| `enable_terrell_placeholder`    | bool  | false   | Advanced — see below |
+| `terrell_strength`              | float | 1.0     | 0.0 – 2.0        |
+| `ray_level_warning`             | str   | (warning text) | read-only by convention |
 | `geometry_mode`                 | enum  | Off     | Off / Proxy Scale / Point Deform Approx |
 | `velocity_axis_source`          | enum  | Camera Forward | Camera Forward / World Z / Custom Vector |
 | `contraction_strength`          | float | 1.0     | 0.0 – 2.0        |
@@ -382,6 +385,53 @@ without requiring the renderer.
 
 ---
 
+## Advanced: Terrell rotation placeholder
+
+> **This is not real Terrell rotation.**
+>
+> *"This is an artistic approximation. True Terrell rotation requires
+> ray-level rendering or custom shader/camera implementation."*
+>
+> The same warning text is written into the controller's
+> `ray_level_warning` user-data field at rig creation.
+
+The "Advanced" block on the controller exposes:
+
+| Field                          | Type  | Default | Notes |
+|--------------------------------|-------|---------|-------|
+| `enable_terrell_placeholder`   | bool  | false   | Off by default. Off ⇒ no rotation written. |
+| `terrell_strength`             | float | 1.0     | 0..2 artistic multiplier. |
+| `ray_level_warning`            | str   | (warning text) | Read-only by convention. |
+
+When `enable_terrell_placeholder` is on, the evaluator calls
+`ls_terrell.apply_terrell_placeholder(proxy, camera, beta, strength)`
+each tick. The function:
+
+* Stamps the proxy's current `ID_BASEOBJECT_REL_ROTATION` into a
+  private BC slot the first time it runs (one-shot baseline capture).
+* Writes `baseline + asin(|β|) * strength * sign(β)` onto the
+  proxy's heading (Y / `.y` in C4D's HPB convention). Pitch and bank
+  stay at baseline so the contraction axis the geometry pass set up
+  on local Z is preserved.
+* β is clamped to `±0.999` before `asin`, so the placeholder angle
+  approaches but never reaches ±π/2.
+
+When the flag is off (or `reset_ls_camera_rig` runs),
+`ls_terrell.restore_terrell(proxy)` writes the baseline back and
+clears the marker so a subsequent re-enable re-captures from the
+current rotation.
+
+**Why a separate module / Advanced block?** The placeholder is
+*strictly artistic* and intentionally kept out of
+`ls_relativity_math`. It also doesn't try to model retarded-time
+sampling, light-cone intersections, or per-vertex transforms —
+those are the things a real Terrell implementation needs and they
+belong in a future ray-level pass (custom shader, custom render-
+pass plugin, or scripted camera). Search for `TODO: ray-level` in
+`ls_terrell.py` for the punch list.
+
+---
+
 ## Installation
 
 1. **Locate your Cinema 4D plugin folder.**
@@ -504,6 +554,7 @@ C4D_ls-cam/
 ├── ls_searchlight.py  # per-target relativistic-beaming intensity (viewport / luminance / Octane)
 ├── ls_presets.py      # A Slower Speed of Light preset table + apply_preset
 ├── ls_diagnostics.py  # HUD overlay + cos-theta debug material preview
+├── ls_terrell.py      # Advanced: artistic Terrell-rotation placeholder (NOT real)
 ├── ls_octane.py       # Octane discovery / attach / dump
 ├── ls_octane_params.py    # symbolic slot table for Octane camera-tag params
 ├── ls_relativity_math.py  # pure-Python relativistic helpers (no c4d import)

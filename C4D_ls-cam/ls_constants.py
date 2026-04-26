@@ -114,6 +114,25 @@ UD_MAX_INTENSITY_MULTIPLIER = "max_intensity_multiplier"
 # so the production render path is untouched until the user opts in.
 UD_DEBUG_MATERIAL_PREVIEW = "debug_material_preview"
 
+# ---- Advanced (Terrell placeholder + ray-level future work) --------------
+# Important: this is NOT a true Terrell-Penrose rotation. Real Terrell
+# requires per-ray retarded-time sampling that has to live at the
+# render-engine / shader level. The placeholder here applies a small
+# heading-axis rotation to the LS_Geometry_Proxy null so artists have
+# *something* visible to dial when they're prototyping shots, while
+# keeping the production-relevant approximations cleanly separated.
+UD_ENABLE_TERRELL_PLACEHOLDER = "enable_terrell_placeholder"
+UD_TERRELL_STRENGTH = "terrell_strength"
+UD_RAY_LEVEL_WARNING = "ray_level_warning"
+
+# Default text written into the UD_RAY_LEVEL_WARNING string field on rig
+# creation. Treated as read-only by convention -- it's a STRING UD field
+# so a user *could* edit it, but the rig never re-reads it.
+TERRELL_WARNING_TEXT = (
+    "This is an artistic approximation. True Terrell rotation requires "
+    "ray-level rendering or custom shader/camera implementation."
+)
+
 # ---- Computed (read-only) outputs --------------------------------------------
 # These fields are written by ls_evaluator.update_ls_camera_rig() every time
 # the controller is evaluated. They are exposed as user-data so artists can
@@ -229,6 +248,9 @@ UD_LABELS = {
     UD_SEARCHLIGHT_MODE: "Searchlight Mode",
     UD_MAX_INTENSITY_MULTIPLIER: "Max Intensity Multiplier",
     UD_DEBUG_MATERIAL_PREVIEW: "Debug Material Preview",
+    UD_ENABLE_TERRELL_PLACEHOLDER: "Advanced: Enable Terrell Placeholder",
+    UD_TERRELL_STRENGTH: "Advanced: Terrell Strength",
+    UD_RAY_LEVEL_WARNING: "Advanced: Ray-Level Note (read-only)",
     UD_OUT_GAMMA: "Gamma (computed)",
     UD_OUT_CONTRACTION: "Contraction Factor (computed)",
     UD_OUT_DOPPLER_FWD: "Doppler Forward Factor (computed)",
@@ -252,6 +274,14 @@ UD_RANGES = {
     UD_DOPPLER_COLOR_STRENGTH: (0.0, 2.0, 1.0),
     UD_SEARCHLIGHT_STRENGTH: (0.0, 2.0, 1.0),
     UD_MAX_INTENSITY_MULTIPLIER: (1.0, 1000.0, 10.0),
+    UD_TERRELL_STRENGTH: (0.0, 2.0, 1.0),
+}
+
+# String user-data fields. The default string is also written as the
+# field's value at rig creation; rigs never re-read these (treated as
+# read-only).
+UD_STRINGS = {
+    UD_RAY_LEVEL_WARNING: TERRELL_WARNING_TEXT,
 }
 
 # Enum (cycle) fields. ``items`` is the ordered list of dropdown entries;
@@ -305,6 +335,7 @@ UD_BOOL_DEFAULTS = {
     UD_DEBUG_MODE: False,
     UD_AFFECT_SELECTED_ONLY: True,
     UD_DEBUG_MATERIAL_PREVIEW: False,
+    UD_ENABLE_TERRELL_PLACEHOLDER: False,
 }
 
 # Ordered list driving the order of fields in the Attribute Manager.
@@ -339,6 +370,10 @@ UD_ORDER = [
     UD_MAX_INTENSITY_MULTIPLIER,
     # Diagnostics.
     UD_DEBUG_MATERIAL_PREVIEW,
+    # Advanced (Terrell placeholder + ray-level future work).
+    UD_ENABLE_TERRELL_PLACEHOLDER,
+    UD_TERRELL_STRENGTH,
+    UD_RAY_LEVEL_WARNING,
     # Computed (read-only) outputs.
     UD_OUT_GAMMA,
     UD_OUT_CONTRACTION,

@@ -36,6 +36,7 @@ import ls_geometry
 import ls_doppler_materials
 import ls_searchlight
 import ls_diagnostics
+import ls_terrell
 
 
 # Prefix used to store per-Octane-slot baselines on the controller as
@@ -584,6 +585,28 @@ def update_ls_camera_rig(doc, controller, camera):
         contraction_strength=contraction_strength,
     )
 
+    # ---- effect 6 (Advanced): Terrell rotation placeholder ---------------
+    # Strictly artistic; lives in its own module + own UD flag so it
+    # never gets mixed up with the physical approximations above. The
+    # heading-axis rotation is composed on top of the proxy's captured
+    # baseline rotation so the contraction axis stays aligned, and a
+    # restore writes the baseline back when the flag is off.
+    enable_terrell = bool(_read(controller, lookup,
+                                K.UD_ENABLE_TERRELL_PLACEHOLDER,
+                                default=False))
+    terrell_strength = max(0.0, _coerce_float(
+        _read(controller, lookup, K.UD_TERRELL_STRENGTH, default=1.0), 1.0))
+    proxy = ls_geometry.find_existing_proxy(doc)
+    if enable_terrell:
+        ls_terrell.apply_terrell_placeholder(
+            proxy_object=proxy,
+            camera=camera,
+            beta=beta,
+            strength=terrell_strength * strength,
+        )
+    else:
+        ls_terrell.restore_terrell(proxy)
+
     # ---- diagnostics: cos-theta heatmap (after Doppler/searchlight) ------
     # When debug_material_preview is on, override LS_Doppler_<x> colours
     # with a heatmap so the user can see at a glance which surfaces the
@@ -736,6 +759,13 @@ def reset_ls_camera_rig(doc, controller, camera):
     # and clears the markers so the next enable re-captures from the
     # current state.
     ls_searchlight.restore_searchlight(doc)
+
+    # ---- restore Terrell placeholder rotation (if any) -------------------
+    # The placeholder stamps its baseline onto the proxy itself, so we
+    # find the proxy first and hand it to ls_terrell.restore_terrell.
+    # Cheap when there's no marker (single BC read).
+    proxy_for_terrell = ls_geometry.find_existing_proxy(doc)
+    ls_terrell.restore_terrell(proxy_for_terrell)
 
     # ---- snap geometry proxy back to identity scale (if present) ---------
     # We do NOT delete or unwrap the proxy here -- removal is the
