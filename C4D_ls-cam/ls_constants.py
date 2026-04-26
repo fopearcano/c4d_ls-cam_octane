@@ -23,6 +23,8 @@ PLUGIN_ID_DOPPLER_MAT_ADD = 1000004
 PLUGIN_ID_DOPPLER_MAT_RESTORE = 1000005
 PLUGIN_ID_PRESETS = 1000006
 PLUGIN_ID_DIAG_TOGGLE = 1000007
+PLUGIN_ID_RESTORE_CAMERA = 1000008
+PLUGIN_ID_REMOVE_RIG = 1000009
 
 PLUGIN_NAME = "C4D_ls-cam"
 COMMAND_NAME = "Create LS Relativistic Camera Rig"
@@ -40,6 +42,12 @@ DOPPLER_MAT_RESTORE_HELP = "Reassigns texture tags to the originals and deletes 
 
 PRESETS_NAME = "LS Cam: Apply Relativity Preset"
 PRESETS_HELP = "Opens a dialog to apply curated beta/strength presets to the controller."
+
+RESTORE_CAMERA_NAME = "LS Cam: Restore Camera Defaults"
+RESTORE_CAMERA_HELP = "Snaps the camera + outputs back to baseline (FOV, focus, aperture, displays, materials, proxy, Terrell)."
+
+REMOVE_RIG_NAME = "LS Cam: Remove LS Camera Rig"
+REMOVE_RIG_HELP = "Resets the camera state then deletes the LS_Camera_Rig hierarchy. Geometry-proxy and Doppler-material clones are left in place."
 
 DIAG_TOGGLE_NAME = "LS Cam: Toggle Diagnostic Overlay"
 DIAG_TOGGLE_HELP = "Adds or removes a HUD-style overlay near the camera that shows live beta/gamma/contraction/Doppler/searchlight values."

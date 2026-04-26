@@ -8,6 +8,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Audit pass: dedicated restore + remove commands.**
+  - `ls_rig.remove_rig(doc)`: resets the camera/material/proxy/
+    Terrell state via `ls_evaluator.reset_ls_camera_rig` first,
+    then deletes the LS_Camera_Rig hierarchy in a single undo
+    block. Geometry-proxy and Doppler-material clones are left in
+    place so each command's blast radius stays minimal -- removal
+    of those is the explicit responsibility of the dedicated
+    Remove Geometry Proxy / Restore Original Materials commands.
+    StartUndo failure (rare) falls back to a non-undoable delete
+    rather than aborting the user's command.
+  - **LS Cam: Restore Camera Defaults** (id `1000008`): wraps
+    `reset_ls_camera_rig`. GetState greys the menu when no rig is
+    present.
+  - **LS Cam: Remove LS Camera Rig** (id `1000009`): wraps
+    `ls_rig.remove_rig`. GetState greys the menu when no rig is
+    present. Status message reminds the user that proxy/material
+    clones were left untouched.
+- README "Restoring + removing" table mapping every reversible
+  state to the command that resets it.
+- README "Troubleshooting" section covering: plugin not appearing
+  in the Extensions menu, Octane tag not detected, Octane param
+  IDs missing, materials not updating, scene runs too slow.
+- Effect-classification banner comments in `ls_relativity_math`,
+  `ls_evaluator`, `ls_geometry`, `ls_doppler_materials`, and
+  `ls_terrell`. Three labels:
+  - `[PHYSICAL]`      formula derived from special relativity.
+  - `[ARTISTIC]`      strength knob with no direct physical meaning.
+  - `[UNIMPLEMENTED]` placeholder where a real ray-level pass
+    would live; the comment lists what the real implementation
+    would have to compute.
+
+### Changed
+- `ls_constants`: `RESTORE_CAMERA_NAME` / `REMOVE_RIG_NAME` +
+  help strings; two new `PLUGIN_ID_*` constants.
+
+### Notes
+- Existing `try/except ... doc.EndUndo(); raise` blocks throughout
+  `ls_rig`, `ls_geometry`, and `ls_doppler_materials` are
+  functionally `try/finally` for cleanup, audited and left in
+  place. The new `remove_rig` uses an explicit `try/finally`
+  block plus a fallback path for the rare StartUndo failure.
+
+### Added
 - **Advanced (Terrell placeholder + ray-level future-work block)**
   in `ls_terrell.py`:
   - `apply_terrell_placeholder(proxy_object, camera, beta,

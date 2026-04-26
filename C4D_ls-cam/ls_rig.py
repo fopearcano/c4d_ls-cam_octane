@@ -341,6 +341,94 @@ def find_rig_in_document(doc):
     return (rig, camera, controller)
 
 
+def remove_rig(doc):
+    """
+    Remove the LS_Camera_Rig hierarchy from *doc*.
+
+    Behaviour:
+      * Resets the camera/material/proxy/Terrell state via
+        :func:`ls_evaluator.reset_ls_camera_rig` first, so any state
+        the controller was driving snaps back to baseline before the
+        controller goes away.
+      * Deletes the rig null. The camera + controller tag, being
+        descendants, are removed by C4D as part of the same delete.
+      * Leaves the LS_Geometry_Proxy null and any LS_Doppler_*
+        material clones in place. They become inert (no controller
+        to evaluate them) but stay so the user can decide whether to
+        remove them via the dedicated commands. This keeps each
+        command's blast radius minimal -- a Remove Rig click never
+        cascades into deleting other artist work.
+
+    Returns True on success, False if no rig was found.
+
+    Wrapped in a single ``StartUndo``/``EndUndo`` block so a single
+    Ctrl+Z restores the rig (the reset call is itself non-destructive,
+    so the camera state is also recoverable).
+    """
+    if doc is None:
+        return False
+
+    rig, camera, controller = find_rig_in_document(doc)
+    if rig is None:
+        return False
+
+    # Reset first so the camera (and any other driven state) returns to
+    # baseline. Tolerate failure: even if reset can't run, we still
+    # want the rig deletion to proceed.
+    if controller is not None and camera is not None:
+        try:
+            # Lazy import: ls_evaluator imports ls_rig transitively
+            # through other modules and we want to avoid any chance of
+            # an import cycle at module-load time.
+            import ls_evaluator
+            ls_evaluator.reset_ls_camera_rig(doc, controller, camera)
+        except Exception:
+            # Already non-fatal; log via the standard channel so the
+            # console at least shows something went sideways.
+            try:
+                import ls_ui
+                ls_ui.log("remove_rig: reset_ls_camera_rig failed; "
+                          "deleting rig anyway.")
+            except Exception:
+                pass
+
+    try:
+        doc.StartUndo()
+    except Exception:
+        # If C4D refuses to open an undo block for some reason, fall
+        # back to a non-undoable delete rather than aborting the user's
+        # remove command.
+        try:
+            rig.Remove()
+        except Exception:
+            return False
+        try:
+            c4d.EventAdd()
+        except Exception:
+            pass
+        return True
+
+    try:
+        try:
+            doc.AddUndo(c4d.UNDOTYPE_DELETE, rig)
+        except Exception:
+            pass
+        try:
+            rig.Remove()
+        except Exception:
+            return False
+    finally:
+        try:
+            doc.EndUndo()
+        except Exception:
+            pass
+        try:
+            c4d.EventAdd()
+        except Exception:
+            pass
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------

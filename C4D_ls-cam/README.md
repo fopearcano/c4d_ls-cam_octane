@@ -566,6 +566,115 @@ C4D_ls-cam/
 
 ---
 
+## Restoring + removing
+
+The plugin ships dedicated commands for every reversible state. Each
+operates only on its own scope so you never wipe more than you
+intended.
+
+| Command | What it does |
+|---|---|
+| **LS Cam: Restore Camera Defaults** | Calls `ls_evaluator.reset_ls_camera_rig`. Snaps camera FOV / focus / aperture, computed-output UD fields, all `LS_Doppler_*` clones, the `LS_Geometry_Proxy` scale, and the Terrell heading rotation back to baselines. Touches no scene-graph topology. |
+| **LS Cam: Remove Relativistic Geometry Proxy** | Re-inserts each child at the proxy's parent level (world transforms preserved), strips the `LS_GeomProxyMember` marker tag, deletes the proxy null. Undoable. |
+| **LS Cam: Restore Original Materials** | Re-points every texture tag pointing at an `LS_Doppler_*` clone at the original (looked up by stored name), then deletes the clones. Reports any originals it can't find by name. Undoable. |
+| **LS Cam: Remove LS Camera Rig** | Calls Restore Camera Defaults first, then deletes the rig null (camera + controller tag go with it). **Leaves geometry-proxy and Doppler-material clones in place** — remove them via the dedicated commands above if you want a clean slate. Undoable. |
+
+---
+
+## Troubleshooting
+
+### Plugin does not appear in the Extensions menu
+
+* **Folder placement.** The `C4D_ls-cam/` folder (the one containing
+  `c4d_ls_cam.pyp`) must sit directly inside Cinema 4D's `plugins/`
+  directory. Don't nest it inside another folder; the `.pyp` file is
+  what C4D auto-loads.
+* **Permissions.** The folder must be readable by the user account
+  running C4D. On macOS / Linux, check `chmod`.
+* **Console.** Open `Extensions ▸ Console`. On a clean start you
+  should see one `[C4D_ls-cam] Registered command id=…` line per
+  command (currently 9). If you see Python tracebacks instead, the
+  `.pyp` failed to import — usually because a sibling module is
+  missing (the whole `C4D_ls-cam/` folder must be copied as a unit).
+* **Plugin ID collision.** The shipped IDs (`1000001`–`1000009`) are
+  in Maxon's reserved test range. If another in-house plugin in your
+  install already uses one, registration logs `FAILED to register
+  command id=… Is the ID already in use?`. Replace `PLUGIN_ID*`
+  in `ls_constants.py` with values from your registered Maxon range
+  before shipping the plugin externally.
+
+### "Octane Camera Tag not found" / Octane tag not detected
+
+* `ls_octane.find_octane_camera_tag_id()` scans registered tag
+  plugins for one whose name (lowercased) contains both `octane`
+  and `camera`. If your Octane build registers the tag under a
+  different name, no match is found.
+* Check what's registered: in the Python console run
+  `import c4d; [(p.GetID(), p.GetName()) for p in
+  c4d.plugins.FilterPluginList(c4d.PLUGINTYPE_TAG, True)
+  if 'octane' in (p.GetName() or '').lower()]`. If the camera tag
+  appears under an unexpected name, paste its integer plugin ID
+  into `OCTANE_CAMERA_TAG_ID` at the top of `ls_octane.py` to
+  override the discovery heuristic.
+* Re-run discovery without restarting C4D:
+  `ls_octane.find_octane_camera_tag_id(force_refresh=True)`.
+* If Octane truly is missing, the `Add Octane Camera Tag` flag on
+  the controller is a no-op — every other effect still works.
+
+### Octane parameter IDs missing / Octane params not driven
+
+* `ls_octane_params.OCTANE_CAMERA_PARAMS` ships every slot's
+  `param_id` as `None`. The evaluator deliberately skips unmapped
+  slots — it never guesses, because a wrong ID could overwrite an
+  unrelated parameter.
+* Map them once per Octane version following the README's *"How to
+  map Octane parameter IDs"* section. The dump prints the symbolic
+  slots that are still unmapped after each `dump_octane_tag_parameters`
+  call, so it doubles as a checklist.
+
+### Materials are not updating
+
+* **Toggle on.** `enable_doppler_color` must be ON on the
+  controller (it is by default). When OFF the evaluator calls
+  `ls_doppler_materials.restore_baseline_colors`, which paints
+  every duplicate back to its captured baseline colour.
+* **Strength on.** `doppler_color_strength` and `effect_strength`
+  multiply. If either is at 0 the colour write resolves to the
+  baseline.
+* **Duplicate exists.** Live colour writes only run on
+  `LS_Doppler_*` clones, not on the originals. Run `LS Cam: Add
+  Doppler Material Controller` (with objects or materials selected)
+  to create the clones.
+* **Classic material only.** The per-tick colour write is gated to
+  `c4d.Mmaterial`. Octane / Redshift / Arnold node-graph materials
+  are still cloned (so the lifecycle works), but their colour sits
+  in shader nodes — see the per-engine TODO list at the top of
+  `ls_doppler_materials.py`.
+* **Texture chains.** The shift only writes the flat colour
+  channel. A material with a heavy texture on top will look mostly
+  unshifted because the texture multiplies on top of the colour.
+
+### Scene runs too slow
+
+* The per-frame cost scales with: number of `LS_Doppler_*` clones,
+  number of objects under the `LS_Geometry_Proxy`, and number of
+  searchlight-controlled objects. Each is independent, so you can
+  trim them in isolation:
+  - Doppler: run `LS Cam: Restore Original Materials` to remove
+    the duplicate set, leaving the originals intact.
+  - Geometry proxy: run `LS Cam: Remove Relativistic Geometry
+    Proxy` to unwrap.
+  - Searchlight: switch `searchlight_mode` to `Viewport Only`
+    (no material writes) or set `searchlight_strength` to 0.
+* `affect_selected_only` on the controller, when enabled at proxy
+  creation, narrows the proxy's child set to the current
+  selection — leave it on in scenes with thousands of objects.
+* Set `debug_mode` OFF in production sessions; the per-target
+  prints are useful for diagnosing the rig but produce a console
+  line per controlled object per evaluation.
+
+---
+
 ## Development
 
 - **Target:** Cinema 4D 2025+ (Python 3 SDK).

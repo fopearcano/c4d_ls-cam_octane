@@ -22,6 +22,24 @@ Design notes
   exposure beaming, DoF aperture scaling) are explicitly flagged as
   artistic approximations in the comments.
 * Geometry deformation and material updates are still out of scope.
+
+Effect classification (matches :mod:`ls_relativity_math`)
+---------------------------------------------------------
+    [PHYSICAL]      -- gamma, contraction factor, Doppler forward
+                       factor, searchlight intensity factor (D^4 with
+                       artistic strength exponent), Doppler colour-
+                       temperature shift T_obs = T_emit * D.
+    [ARTISTIC]      -- FOV widening factors per ``fov_mode``, the
+                       linear DoF/aperture coefficient, the linear
+                       motion-blur coefficient, the per-effect
+                       strength sliders that compose with
+                       ``effect_strength``.
+    [UNIMPLEMENTED] -- engine-specific motion-blur writes (the
+                       computed multiplier is exposed for debug only),
+                       Octane imager param writes that depend on
+                       slot mappings, ray-level Terrell rotation
+                       (delegated to :mod:`ls_terrell` placeholder),
+                       per-vertex contraction / Terrell warp.
 """
 
 import math

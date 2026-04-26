@@ -36,6 +36,17 @@ ray level.
 TODO: ray-level visual transformation (Terrell rotation, retarded-time
 sampling, per-pixel aberration warp). That work likely lives in a
 shader or a custom render-pass plugin, not in this evaluator.
+
+Classification:
+    [PHYSICAL]      -- the contraction factor sqrt(1 - beta^2) used
+                       to drive the proxy null's local Z scale.
+    [ARTISTIC]      -- the contraction_strength blend that lets
+                       artists exaggerate (or fade out) the
+                       contraction without touching beta.
+    [UNIMPLEMENTED] -- per-vertex deformation, retarded-time sampling,
+                       Terrell-Penrose rotation, per-pixel aberration
+                       warp. See the GEOM_MODE_POINT_DEFORM branch in
+                       :func:`apply_proxy_contraction` for the TODO.
 """
 
 import c4d

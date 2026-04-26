@@ -3,6 +3,12 @@ ls_terrell.py
 =============
 Artistic placeholder for Terrell-Penrose rotation.
 
+Classification:
+    [ARTISTIC]      -- the heading-axis rotation written in
+                       :func:`apply_terrell_placeholder`.
+    [UNIMPLEMENTED] -- real Terrell-Penrose rotation. See the
+                       "Future ray-level work" section below.
+
 **This is not real Terrell rotation.** Real Terrell-Penrose is a
 per-ray, retarded-time visual phenomenon: light from different
 points of a moving object reaches the observer at different

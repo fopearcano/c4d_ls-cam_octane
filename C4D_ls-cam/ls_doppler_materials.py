@@ -51,6 +51,18 @@ What is NOT in this pass
   colour channel; baseline-textured materials will look approximately
   shifted via the colour multiplier but will not have their textures
   re-tinted spectrum-correctly.
+
+Classification:
+    [PHYSICAL]      -- ``RM.doppler_factor(beta, cos_theta)``;
+                       cos_theta from forward . line-of-sight in the
+                       observer frame.
+    [ARTISTIC]      -- ``RM.wavelength_shift_rgb_approx``: the
+                       R<->G<->B cascade tinted by the strength
+                       slider. Visually consistent with blueshift /
+                       redshift but not a spectral renderer.
+    [UNIMPLEMENTED] -- spectrum-correct shift on textured / node-
+                       graph materials; per-engine colour writes for
+                       Octane / Redshift / Arnold (see TODO above).
 """
 
 import c4d

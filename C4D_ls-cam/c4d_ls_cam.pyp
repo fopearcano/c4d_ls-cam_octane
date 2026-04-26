@@ -179,6 +179,70 @@ class AddDopplerMaterialController(c4d.plugins.CommandData):
         return c4d.CMD_ENABLED
 
 
+class RestoreCameraDefaults(c4d.plugins.CommandData):
+    """Menu command: snap the camera + outputs back to baseline."""
+
+    def Execute(self, doc):
+        if doc is None:
+            doc = c4d.documents.GetActiveDocument()
+        if doc is None:
+            ls_ui.error("No active document.")
+            return False
+        rig, camera, controller = ls_rig.find_rig_in_document(doc)
+        if controller is None or camera is None:
+            ls_ui.error(
+                "No LS_Camera_Rig found. Run 'Create LS Relativistic "
+                "Camera Rig' first."
+            )
+            return False
+        try:
+            ls_evaluator.reset_ls_camera_rig(doc, controller, camera)
+        except Exception as exc:
+            traceback.print_exc()
+            ls_ui.error("Restore Camera Defaults failed:\n\n{0}".format(exc))
+            return False
+        ls_ui.status("Camera defaults restored.")
+        return True
+
+    def GetState(self, doc):
+        if doc is None:
+            return 0
+        rig, _, controller = ls_rig.find_rig_in_document(doc)
+        return c4d.CMD_ENABLED if (rig is not None and controller is not None) else 0
+
+
+class RemoveLSCameraRig(c4d.plugins.CommandData):
+    """Menu command: reset state, then delete the rig hierarchy."""
+
+    def Execute(self, doc):
+        if doc is None:
+            doc = c4d.documents.GetActiveDocument()
+        if doc is None:
+            ls_ui.error("No active document.")
+            return False
+        try:
+            removed = ls_rig.remove_rig(doc)
+        except Exception as exc:
+            traceback.print_exc()
+            ls_ui.error("Remove LS Camera Rig failed:\n\n{0}".format(exc))
+            return False
+        if not removed:
+            ls_ui.error("No LS_Camera_Rig found in this scene.")
+            return False
+        ls_ui.status(
+            "Removed LS_Camera_Rig. Geometry-proxy and Doppler-material "
+            "clones (if any) were left in place; remove them via their "
+            "own commands if you want a clean slate."
+        )
+        return True
+
+    def GetState(self, doc):
+        if doc is None:
+            return 0
+        rig, _, _ = ls_rig.find_rig_in_document(doc)
+        return c4d.CMD_ENABLED if rig is not None else 0
+
+
 class RestoreOriginalMaterials(c4d.plugins.CommandData):
     """Menu command: re-point texture tags to originals + delete duplicates."""
 
@@ -424,6 +488,10 @@ def _register():
                   K.DOPPLER_MAT_RESTORE_HELP, RestoreOriginalMaterials())
     _register_one(K.PLUGIN_ID_PRESETS, K.PRESETS_NAME,
                   K.PRESETS_HELP, ApplyRelativityPreset())
+    _register_one(K.PLUGIN_ID_RESTORE_CAMERA, K.RESTORE_CAMERA_NAME,
+                  K.RESTORE_CAMERA_HELP, RestoreCameraDefaults())
+    _register_one(K.PLUGIN_ID_REMOVE_RIG, K.REMOVE_RIG_NAME,
+                  K.REMOVE_RIG_HELP, RemoveLSCameraRig())
     _register_one(K.PLUGIN_ID_DIAG_TOGGLE, K.DIAG_TOGGLE_NAME,
                   K.DIAG_TOGGLE_HELP, ToggleDiagnosticOverlay())
 

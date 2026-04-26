@@ -25,6 +25,23 @@ References
 * Relativistic aberration:  cos(theta') = (cos(theta) - beta) / (1 - beta cos(theta))
 * Relativistic Doppler:     D = 1 / (gamma (1 - beta cos(theta)))
 * Relativistic beaming:     I_obs / I_src ~ D^4  (specific intensity)
+
+Effect classification used across the project
+---------------------------------------------
+Comments throughout the codebase prefix each computation with one of:
+
+    [PHYSICAL]      -- formula derived from special relativity; bounded
+                       and stable, suitable for visual approximation but
+                       not for laboratory measurements.
+    [ARTISTIC]      -- knob with no direct physical meaning; tuned by
+                       feel. Always gated by a strength slider so
+                       artists can dial the effect down to identity.
+    [UNIMPLEMENTED] -- placeholder where a real ray-level pass would
+                       live. Comment explains what the real
+                       implementation would have to compute.
+
+Every helper in *this* module is [PHYSICAL] (with the artistic
+``strength`` knobs documented per-function).
 """
 
 import math
