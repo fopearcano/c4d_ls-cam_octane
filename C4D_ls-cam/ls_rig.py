@@ -9,10 +9,9 @@ Public entry point:
         created camera, rig null, and controller tag. All scene mutations are
         wrapped in a single undo step so the user can Ctrl+Z the whole rig.
 
-This module deliberately does NOT implement any relativistic math. It only
-sets up the scene graph and exposes parameters via user data. The math is
-expected to live in a separate Python tag script (or a future
-ls_relativity.py) that reads the user data on every frame.
+This module is responsible for the scene graph only. The actual
+relativistic evaluation lives in :mod:`ls_evaluator`; the controller tag
+created here is a thin shim that calls into it on every scene update.
 """
 
 import c4d
@@ -63,6 +62,13 @@ def _build_user_data(tag):
     Returns a dict mapping the user-data key (string) to its DescID, so the
     caller (or downstream math code) can read/write the parameters reliably
     even if the user reorders fields later.
+
+    Computed-output fields (``UD_OUTPUT_KEYS`` plus the internal rest-FOV
+    cache) are added with the same DTYPE_REAL widget but their labels are
+    suffixed with "(computed)" / "(internal)" to signal that they are
+    written by the evaluator and should be treated as read-only -- C4D
+    has no native read-only flag for user data, so we rely on convention
+    plus the evaluator overwriting these on every tick.
     """
     ud_ids = {}
 
@@ -71,6 +77,9 @@ def _build_user_data(tag):
 
         if key in K.UD_RANGES:
             vmin, vmax, default = K.UD_RANGES[key]
+            ud_ids[key] = _add_real_ud(tag, label, default, vmin, vmax)
+        elif key in K.UD_OUTPUT_RANGES:
+            vmin, vmax, default = K.UD_OUTPUT_RANGES[key]
             ud_ids[key] = _add_real_ud(tag, label, default, vmin, vmax)
         elif key in K.UD_BOOL_DEFAULTS:
             default = K.UD_BOOL_DEFAULTS[key]
@@ -82,6 +91,27 @@ def _build_user_data(tag):
             )
 
     return ud_ids
+
+
+def _capture_rest_fov(tag, camera):
+    """
+    Store the camera's current FOV on the controller tag.
+
+    The evaluator derives the live FOV from this baseline every tick, so
+    capturing it once at rig-creation keeps the effect non-destructive: if
+    the user disables ``enable_lorentz_geometry`` (or sets beta to 0) the
+    camera returns to exactly its starting FOV.
+    """
+    fov_id = None
+    for desc_id, bc in tag.GetUserDataContainer():
+        if bc[c4d.DESC_NAME] == K.UD_LABELS[K.UD_REST_FOV_RAD]:
+            fov_id = desc_id
+            break
+    if fov_id is None:
+        # Should be impossible: _build_user_data inserts every UD_ORDER key.
+        return
+    rest_fov = float(camera[c4d.CAMERAOBJECT_FOV])
+    tag[fov_id] = rest_fov
 
 
 # ---------------------------------------------------------------------------
@@ -109,30 +139,59 @@ def _make_rig_null():
     return null
 
 
+# Tag script body. Kept as a triple-quoted string so the rig builder can
+# inject it verbatim. Logic is deliberately kept in the importable
+# ``ls_evaluator`` module -- the tag is just a thin shim that finds the
+# camera under its host null and delegates.
+_CONTROLLER_TAG_SOURCE = '''\
+# LS_Relativity_Controller -- evaluation shim.
+# All real work lives in ls_evaluator.update_ls_camera_rig(); this script
+# only locates the camera under the rig null and forwards the call.
+import c4d
+
+
+def _find_ls_camera(host):
+    if host is None:
+        return None
+    child = host.GetDown()
+    while child is not None:
+        if child.GetType() == c4d.Ocamera:
+            return child
+        child = child.GetNext()
+    return None
+
+
+def main():
+    tag = op  # noqa: F821 -- 'op' is injected by C4D's Python tag runtime
+    host = tag.GetObject()
+    cam = _find_ls_camera(host)
+    if cam is None:
+        return
+
+    try:
+        import ls_evaluator
+    except ImportError:
+        # Plugin folder isn't on sys.path (e.g. tag was copied to a scene
+        # without the plugin installed). Fail quietly.
+        return
+
+    ls_evaluator.update_ls_camera_rig(tag.GetDocument(), tag, cam)
+'''
+
+
 def _make_controller_tag(host):
     """
     Create the relativity controller tag and attach it to *host*.
 
-    A Python Tag (Tpython) is used so we can later embed the relativistic
-    math directly in the tag's main() callback. The tag is created in a
-    'no-op' state -- its script is left empty until the math module lands.
+    A Python Tag (Tpython) is used so the relativistic evaluation runs
+    automatically each time the scene is evaluated. The tag's body is a
+    thin shim that delegates to ``ls_evaluator.update_ls_camera_rig``.
     """
     tag = c4d.BaseTag(c4d.Tpython)
     if tag is None:
         raise RuntimeError("Failed to allocate Python tag (Tpython).")
     tag.SetName(K.CONTROLLER_TAG_NAME)
-
-    # Empty placeholder script. Real implementation will read user data
-    # from op (the host) and drive camera / shader parameters.
-    tag[c4d.TPYTHON_CODE] = (
-        "# LS_Relativity_Controller -- placeholder.\n"
-        "# Relativistic math will be implemented here in a later commit.\n"
-        "import c4d\n"
-        "\n"
-        "def main():\n"
-        "    pass\n"
-    )
-
+    tag[c4d.TPYTHON_CODE] = _CONTROLLER_TAG_SOURCE
     host.InsertTag(tag)
     return tag
 
@@ -183,10 +242,15 @@ def build_rig(doc):
         doc.AddUndo(c4d.UNDOTYPE_NEW, controller_tag)
         ud_ids = _build_user_data(controller_tag)
 
-        # 5. Optional Octane camera tag -- safe no-op if Octane isn't present.
+        # 5. Capture the camera's rest FOV onto the controller. The
+        # evaluator derives every live FOV from this baseline so changes
+        # remain non-destructive.
+        _capture_rest_fov(controller_tag, camera)
+
+        # 6. Optional Octane camera tag -- safe no-op if Octane isn't present.
         ls_octane.add_octane_camera_tag(camera)
 
-        # 6. Make the new camera the active selection so the user sees it.
+        # 7. Make the new camera the active selection so the user sees it.
         doc.SetActiveObject(camera, c4d.SELECTION_NEW)
 
     except Exception:

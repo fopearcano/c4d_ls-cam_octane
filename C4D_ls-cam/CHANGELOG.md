@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `ls_evaluator.py`: new module with `update_ls_camera_rig(doc, controller,
+  camera)`. Reads the controller's user data, computes
+  `gamma`, `contraction_factor`, `doppler_forward_factor`, and
+  `searchlight_multiplier`, writes them to read-only-by-convention
+  output fields on the controller, and adjusts the camera's FOV from a
+  cached rest-FOV baseline. Motion-blur multiplier is computed but not
+  yet applied to any render setting (engine-agnostic placeholder).
+- Read-only output user-data fields on the controller: `gamma`,
+  `contraction_factor`, `doppler_forward_factor`,
+  `searchlight_multiplier`. Plus an internal `_rest_fov_rad` cache so FOV
+  changes stay non-destructive.
+- The controller's Python tag is no longer a no-op: its `main()` now
+  finds the camera under the rig null and forwards to
+  `ls_evaluator.update_ls_camera_rig`.
+- Debug print (gated on `debug_mode`) showing beta, strength, gamma,
+  contraction, doppler factor, searchlight, FOV multiplier, and
+  motion-blur multiplier.
+
+### Changed
+- `ls_rig.py` now also captures the camera's rest FOV onto the controller
+  at rig creation, and embeds the new evaluator-shim source as the
+  Python tag body.
+
 - `ls_relativity_math.py`: pure-Python helpers (no C4D dependency) for
   special-relativistic visual effects -- `clamp_beta`, `gamma_from_beta`,
   `lorentz_contraction_factor`, `doppler_factor`,
@@ -31,8 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - README with installation instructions and module layout.
 
 ### Known limitations
-- Relativistic math is **not** implemented yet; the controller's Python tag
-  is a no-op placeholder.
+- Geometry deformation (Lorentz contraction applied to scene meshes) is
+  not implemented yet -- the FOV update is the only camera-side effect
+  currently driven by `beta_velocity`.
+- Material / shader updates (Doppler color shift) are not implemented yet.
+- Motion-blur multiplier is computed but not written to any render
+  setting; the value is exposed in the debug log only.
 - `PLUGIN_ID` is a development-only placeholder and must be replaced with
   a Maxon-registered ID before public distribution.
 - `OCTANE_CAMERA_TAG_ID` is `None`; Octane tag attachment is intentionally

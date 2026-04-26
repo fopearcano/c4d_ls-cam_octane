@@ -39,6 +39,32 @@ Tag on LS_Camera_Rig:
 The whole rig is built in a single undo step — one `Ctrl+Z` removes
 everything the command inserted.
 
+### Computed (read-only) outputs
+
+These fields are written by `ls_evaluator.update_ls_camera_rig()` on every
+scene evaluation. They are exposed as user-data so artists can read them
+in the Attribute Manager, but they are overwritten every tick — treat
+them as read-only:
+
+| Output                    | Meaning                                                  |
+|---------------------------|----------------------------------------------------------|
+| `gamma`                   | Lorentz factor `1 / sqrt(1 - β²)`                        |
+| `contraction_factor`      | `sqrt(1 - β²)` (length contraction along motion axis)    |
+| `doppler_forward_factor`  | Doppler `D` for a head-on line of sight                  |
+| `searchlight_multiplier`  | Relativistic-beaming intensity multiplier (`D^4·strength`) |
+
+### Camera behavior
+
+* **FOV.** The camera's rest FOV is captured at rig creation and stored
+  on the controller. While `enable_lorentz_geometry` is on, the live FOV
+  is `rest_fov · (1 + 0.5 · β · effect_strength)`. Disabling the flag (or
+  setting beta to 0) restores the rest FOV exactly — the effect is
+  non-destructive.
+* **Motion-blur multiplier.** Computed every tick but not yet routed into
+  any render engine's settings; visible in the debug log only.
+* **Geometry / materials.** Not deformed or modified at this stage.
+* **Octane.** Not required at this stage.
+
 ---
 
 ## Installation
@@ -105,6 +131,7 @@ C4D_ls-cam/
 ├── c4d_ls_cam.pyp     # plugin entry point + CommandData registration
 ├── ls_constants.py    # IDs, names, user-data definitions
 ├── ls_rig.py          # rig builder (camera, null, tag, user data, undo)
+├── ls_evaluator.py    # update_ls_camera_rig: drives camera + UD outputs
 ├── ls_octane.py       # Octane integration placeholder
 ├── ls_relativity_math.py  # pure-Python relativistic helpers (no c4d import)
 ├── ls_ui.py           # status / dialog / console helpers
