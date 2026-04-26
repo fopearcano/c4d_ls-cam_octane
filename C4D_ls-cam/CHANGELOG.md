@@ -8,6 +8,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Diagnostic helpers** in `ls_diagnostics.py`:
+  - HUD overlay built from a single `LS_Diagnostic_Overlay` null
+    parented under the LS camera. Five `Osplinetext` rows show
+    live `beta`, `gamma`, `contraction`, `doppler_fwd`, and
+    `searchlight` readouts. Per-row text cached in a private BC
+    slot so `PRIM_TEXT_TEXT` (which forces a spline rebuild)
+    only writes when the formatted value actually changed -- keeps
+    medium scenes performant.
+  - `create_overlay(doc, camera)` / `remove_overlay(doc, camera)`
+    / `toggle_overlay(doc, camera)` lifecycle helpers, all
+    wrapped in single undo blocks.
+  - `update_overlay(camera, computed)`: cheap walk + cached
+    string check; called by the evaluator each tick.
+  - `apply_debug_material_preview(doc, controller, camera)`: when
+    the `debug_material_preview` UD flag is on, overrides every
+    classic-material `LS_Doppler_<x>` clone with a cos(θ) heatmap
+    (blue = approaching, green = perpendicular, red = receding).
+    Runs *after* Doppler / searchlight so the heatmap wins for
+    that tick; toggling the flag off lets next tick's Doppler
+    shift overwrite the heatmap automatically -- no restore step.
+- New CommandData plugin **LS Cam: Toggle Diagnostic Overlay**
+  (id `1000007`) registered in `c4d_ls_cam.pyp`. Symmetric: hit
+  once to add, again to remove.
+- New controller user-data field `debug_material_preview` (bool,
+  default False).
+
+### Changed
+- `ls_evaluator.update_ls_camera_rig`:
+  - Reads `debug_material_preview`; calls
+    `ls_diagnostics.apply_debug_material_preview` after the
+    Doppler / searchlight passes when on.
+  - Always calls `ls_diagnostics.update_overlay(camera, computed)`
+    at the end of the tick. Cheap when no overlay exists.
+- The function now binds the return value to `computed` and
+  passes the same dict to `update_overlay` before returning, so
+  callers (e.g. tests) get the existing return contract while the
+  HUD sees the same numbers.
+
+### Notes
+- The HUD overlay is geometry, so it will appear in renders if
+  framed. Position offset is set to put it just inside the
+  camera's view as a viewport HUD.
+- `debug_material_preview` writes to `MATERIAL_COLOR_COLOR`, so
+  it does affect production renders if left on. Off by default.
+
+### Added
 - **Preset system inspired by *A Slower Speed of Light*** in
   `ls_presets.py`:
   - `PRESETS_ORDERED` table holds six `(name, dict)` tuples covering

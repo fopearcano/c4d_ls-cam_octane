@@ -45,6 +45,7 @@ import ls_geometry        # noqa: E402
 import ls_doppler_materials  # noqa: E402
 import ls_evaluator       # noqa: E402
 import ls_presets         # noqa: E402
+import ls_diagnostics     # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +314,42 @@ class _PresetDialog(c4d.gui.GeDialog):
         ls_ui.status("Reset relativistic camera rig to baseline.")
 
 
+class ToggleDiagnosticOverlay(c4d.plugins.CommandData):
+    """Menu command: add or remove the LS_Diagnostic_Overlay HUD null."""
+
+    def Execute(self, doc):
+        if doc is None:
+            doc = c4d.documents.GetActiveDocument()
+        if doc is None:
+            ls_ui.error("No active document.")
+            return False
+
+        rig, camera, controller = ls_rig.find_rig_in_document(doc)
+        if camera is None:
+            ls_ui.error(
+                "No LS_Camera_Rig found. Run 'Create LS Relativistic "
+                "Camera Rig' first."
+            )
+            return False
+
+        try:
+            added = ls_diagnostics.toggle_overlay(doc, camera)
+        except Exception as exc:
+            traceback.print_exc()
+            ls_ui.error("Toggle overlay failed:\n\n{0}".format(exc))
+            return False
+
+        ls_ui.status(
+            "Diagnostic overlay {0}.".format("created" if added else "removed")
+        )
+        return True
+
+    def GetState(self, doc):
+        if doc is None:
+            return 0
+        return c4d.CMD_ENABLED
+
+
 class ApplyRelativityPreset(c4d.plugins.CommandData):
     """Menu command: open the preset dialog (modeless / async)."""
 
@@ -387,6 +424,8 @@ def _register():
                   K.DOPPLER_MAT_RESTORE_HELP, RestoreOriginalMaterials())
     _register_one(K.PLUGIN_ID_PRESETS, K.PRESETS_NAME,
                   K.PRESETS_HELP, ApplyRelativityPreset())
+    _register_one(K.PLUGIN_ID_DIAG_TOGGLE, K.DIAG_TOGGLE_NAME,
+                  K.DIAG_TOGGLE_HELP, ToggleDiagnosticOverlay())
 
 
 if __name__ == "__main__":

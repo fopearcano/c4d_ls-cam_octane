@@ -22,6 +22,7 @@ PLUGIN_ID_GEOM_PROXY_REMOVE = 1000003
 PLUGIN_ID_DOPPLER_MAT_ADD = 1000004
 PLUGIN_ID_DOPPLER_MAT_RESTORE = 1000005
 PLUGIN_ID_PRESETS = 1000006
+PLUGIN_ID_DIAG_TOGGLE = 1000007
 
 PLUGIN_NAME = "C4D_ls-cam"
 COMMAND_NAME = "Create LS Relativistic Camera Rig"
@@ -40,6 +41,9 @@ DOPPLER_MAT_RESTORE_HELP = "Reassigns texture tags to the originals and deletes 
 PRESETS_NAME = "LS Cam: Apply Relativity Preset"
 PRESETS_HELP = "Opens a dialog to apply curated beta/strength presets to the controller."
 
+DIAG_TOGGLE_NAME = "LS Cam: Toggle Diagnostic Overlay"
+DIAG_TOGGLE_HELP = "Adds or removes a HUD-style overlay near the camera that shows live beta/gamma/contraction/Doppler/searchlight values."
+
 # Prefix used for every duplicated material; also acts as the recognition
 # token in restore_original_materials() so we never delete a material the
 # user happened to name "LS_Doppler_<x>" by hand (we additionally check
@@ -54,6 +58,7 @@ CAMERA_NAME = "LS_Relativistic_Camera"
 RIG_NULL_NAME = "LS_Camera_Rig"
 CONTROLLER_TAG_NAME = "LS_Relativity_Controller"
 GEOMETRY_PROXY_NAME = "LS_Geometry_Proxy"
+DIAGNOSTIC_OVERLAY_NAME = "LS_Diagnostic_Overlay"
 
 # ---------------------------------------------------------------------------
 # User-data parameter keys
@@ -102,6 +107,12 @@ UD_DOPPLER_COLOR_STRENGTH = "doppler_color_strength"
 UD_SEARCHLIGHT_STRENGTH = "searchlight_strength"
 UD_SEARCHLIGHT_MODE = "searchlight_mode"
 UD_MAX_INTENSITY_MULTIPLIER = "max_intensity_multiplier"
+
+# ---- Diagnostics ----------------------------------------------------------
+# Bool master switch for the cos-theta heatmap that overrides
+# LS_Doppler_<x> material colours with a debug palette. Off by default
+# so the production render path is untouched until the user opts in.
+UD_DEBUG_MATERIAL_PREVIEW = "debug_material_preview"
 
 # ---- Computed (read-only) outputs --------------------------------------------
 # These fields are written by ls_evaluator.update_ls_camera_rig() every time
@@ -217,6 +228,7 @@ UD_LABELS = {
     UD_SEARCHLIGHT_STRENGTH: "Searchlight Strength",
     UD_SEARCHLIGHT_MODE: "Searchlight Mode",
     UD_MAX_INTENSITY_MULTIPLIER: "Max Intensity Multiplier",
+    UD_DEBUG_MATERIAL_PREVIEW: "Debug Material Preview",
     UD_OUT_GAMMA: "Gamma (computed)",
     UD_OUT_CONTRACTION: "Contraction Factor (computed)",
     UD_OUT_DOPPLER_FWD: "Doppler Forward Factor (computed)",
@@ -292,6 +304,7 @@ UD_BOOL_DEFAULTS = {
     UD_ENABLE_OCTANE_TAG: False,
     UD_DEBUG_MODE: False,
     UD_AFFECT_SELECTED_ONLY: True,
+    UD_DEBUG_MATERIAL_PREVIEW: False,
 }
 
 # Ordered list driving the order of fields in the Attribute Manager.
@@ -324,6 +337,8 @@ UD_ORDER = [
     UD_SEARCHLIGHT_STRENGTH,
     UD_SEARCHLIGHT_MODE,
     UD_MAX_INTENSITY_MULTIPLIER,
+    # Diagnostics.
+    UD_DEBUG_MATERIAL_PREVIEW,
     # Computed (read-only) outputs.
     UD_OUT_GAMMA,
     UD_OUT_CONTRACTION,

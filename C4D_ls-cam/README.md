@@ -41,6 +41,7 @@ Tag on LS_Camera_Rig:
 | `enable_relativistic_exposure`  | bool  | false   | —                |
 | `enable_octane_camera_tag`      | bool  | false   | —                |
 | `debug_mode`                    | bool  | false   | —                |
+| `debug_material_preview`        | bool  | false   | —                |
 | `geometry_mode`                 | enum  | Off     | Off / Proxy Scale / Point Deform Approx |
 | `velocity_axis_source`          | enum  | Camera Forward | Camera Forward / World Z / Custom Vector |
 | `contraction_strength`          | float | 1.0     | 0.0 – 2.0        |
@@ -321,6 +322,66 @@ won't crash the preset system.
 
 ---
 
+## Diagnostics
+
+### HUD overlay
+
+Run **Extensions ▸ LS Cam: Toggle Diagnostic Overlay** to add or
+remove an `LS_Diagnostic_Overlay` null parented under the LS camera.
+The null carries five `Osplinetext` children that the evaluator
+refreshes every tick:
+
+```
+beta = …
+gamma = …
+contraction = …
+doppler_fwd = …
+searchlight = …
+```
+
+Per-row text is cached in a private BaseContainer slot, so the
+relatively expensive `PRIM_TEXT_TEXT` write (which forces a spline
+rebuild) only fires when the formatted value actually changed —
+performance stays bounded in medium scenes. The overlay is parented
+under the camera, so it follows the framing automatically.
+
+The toggle command is symmetrical: hit it once to create, again to
+remove. Removal is a single undoable step. The overlay is not part
+of any Octane / render output by default — it is geometry, so it
+will appear in renders if you frame it, but the scale/position offset
+is set so it sits just inside the camera view as a viewport HUD.
+
+### Debug material preview
+
+Set the controller's `debug_material_preview` flag to **on** to
+override every `LS_Doppler_<x>` clone's `MATERIAL_COLOR_COLOR` with a
+cos(θ) heatmap:
+
+* **blue** = approaching (cos θ → +1)
+* **green** = perpendicular (cos θ → 0)
+* **red** = receding (cos θ → −1)
+
+The heatmap runs *after* the Doppler / searchlight passes, so it
+wins for that tick. Toggling the flag off lets the next tick's
+Doppler shift overwrite the heatmap automatically — no restore step
+needed. Originals are never touched.
+
+> Heads-up: this does affect production renders if you leave the flag
+> on, because the heatmap is written to the same colour channel the
+> renderer samples. Keep it off when you're not actively diagnosing.
+
+### Display Color fallback
+
+The existing **Searchlight Viewport Only** mode (`searchlight_mode =
+Viewport Only`) writes `ID_BASEOBJECT_USECOLOR` + `ID_BASEOBJECT_COLOR`
+on each controlled object — that's the display-color fallback path
+for previewing the searchlight effect without a renderer. Doppler
+material clones get their own colour shift on
+`MATERIAL_COLOR_COLOR`, which similarly previews in the viewport
+without requiring the renderer.
+
+---
+
 ## Installation
 
 1. **Locate your Cinema 4D plugin folder.**
@@ -442,6 +503,7 @@ C4D_ls-cam/
 ├── ls_doppler_materials.py  # LS_Doppler_<name> material clones + live colour shift
 ├── ls_searchlight.py  # per-target relativistic-beaming intensity (viewport / luminance / Octane)
 ├── ls_presets.py      # A Slower Speed of Light preset table + apply_preset
+├── ls_diagnostics.py  # HUD overlay + cos-theta debug material preview
 ├── ls_octane.py       # Octane discovery / attach / dump
 ├── ls_octane_params.py    # symbolic slot table for Octane camera-tag params
 ├── ls_relativity_math.py  # pure-Python relativistic helpers (no c4d import)

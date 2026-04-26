@@ -35,6 +35,7 @@ import ls_octane_params as OP
 import ls_geometry
 import ls_doppler_materials
 import ls_searchlight
+import ls_diagnostics
 
 
 # Prefix used to store per-Octane-slot baselines on the controller as
@@ -583,6 +584,19 @@ def update_ls_camera_rig(doc, controller, camera):
         contraction_strength=contraction_strength,
     )
 
+    # ---- diagnostics: cos-theta heatmap (after Doppler/searchlight) ------
+    # When debug_material_preview is on, override LS_Doppler_<x> colours
+    # with a heatmap so the user can see at a glance which surfaces the
+    # rig considers approaching vs receding. Runs *after* the Doppler
+    # and searchlight passes so the heatmap wins for that tick;
+    # toggling the flag off lets the next tick's Doppler shift overwrite
+    # the heatmap automatically.
+    debug_material_preview = bool(_read(controller, lookup,
+                                        K.UD_DEBUG_MATERIAL_PREVIEW,
+                                        default=False))
+    if debug_material_preview:
+        ls_diagnostics.apply_debug_material_preview(doc, controller, camera)
+
     # ---- write outputs ---------------------------------------------------
     _write(controller, lookup, K.UD_OUT_GAMMA, float(gamma))
     _write(controller, lookup, K.UD_OUT_CONTRACTION, float(contraction))
@@ -607,7 +621,7 @@ def update_ls_camera_rig(doc, controller, camera):
             )
         )
 
-    return {
+    computed = {
         "beta": beta,
         "strength": strength,
         "gamma": gamma,
@@ -621,6 +635,11 @@ def update_ls_camera_rig(doc, controller, camera):
         "motion_blur_multiplier": motion_blur_mult,
         "octane_tag_present": octane_tag is not None,
     }
+
+    # ---- diagnostics: HUD overlay text (cheap walk if no overlay) --------
+    ls_diagnostics.update_overlay(camera, computed)
+
+    return computed
 
 
 def reset_ls_camera_rig(doc, controller, camera):
