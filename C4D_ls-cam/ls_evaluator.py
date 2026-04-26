@@ -32,6 +32,7 @@ import ls_constants as K
 import ls_relativity_math as RM
 import ls_octane
 import ls_octane_params as OP
+import ls_geometry
 
 
 # Prefix used to store per-Octane-slot baselines on the controller as
@@ -463,6 +464,12 @@ def update_ls_camera_rig(doc, controller, camera):
     exposure_strength = max(0.0, _coerce_float(
         _read(controller, lookup, K.UD_EXPOSURE_STRENGTH, default=1.0), 1.0))
 
+    contraction_strength = max(0.0, _coerce_float(
+        _read(controller, lookup, K.UD_CONTRACTION_STRENGTH, default=1.0), 1.0))
+    geom_mode = int(_coerce_float(
+        _read(controller, lookup, K.UD_GEOMETRY_MODE, default=K.GEOM_MODE_OFF),
+        K.GEOM_MODE_OFF))
+
     enable_lorentz = bool(_read(controller, lookup, K.UD_ENABLE_LORENTZ, default=True))
     enable_searchlight = bool(_read(controller, lookup, K.UD_ENABLE_SEARCHLIGHT, default=True))
     enable_dof = bool(_read(controller, lookup, K.UD_ENABLE_DOF, default=False))
@@ -513,6 +520,17 @@ def update_ls_camera_rig(doc, controller, camera):
     # Materials are NOT modified per the spec -- we just expose the
     # computed delta as a read-only output for downstream consumers.
 
+    # ---- effect 5: Geometry contraction (proxy null) ---------------------
+    # The proxy null itself is created/removed via the menu commands in
+    # ls_geometry.py; this call only drives its local Z scale every tick.
+    # No-op if no proxy exists or geometry_mode is "Off".
+    ls_geometry.apply_proxy_contraction(
+        doc=doc,
+        geom_mode=geom_mode,
+        contraction_factor=contraction,
+        contraction_strength=contraction_strength,
+    )
+
     # ---- write outputs ---------------------------------------------------
     _write(controller, lookup, K.UD_OUT_GAMMA, float(gamma))
     _write(controller, lookup, K.UD_OUT_CONTRACTION, float(contraction))
@@ -523,15 +541,16 @@ def update_ls_camera_rig(doc, controller, camera):
     motion_blur_mult = 1.0 + K.MOTION_BLUR_BETA_COEFF * beta * strength
 
     if debug:
+        geom_label = K.GEOM_MODE_ITEMS[geom_mode] if 0 <= geom_mode < len(K.GEOM_MODE_ITEMS) else str(geom_mode)
         print(
             "[C4D_ls-cam][debug] beta={0:.4f} strength={1:.3f} "
             "gamma={2:.4f} contraction={3:.4f} doppler_fwd={4:.4f} "
             "searchlight={5:.4g} fov_mult={6:.4f} dof_factor={7:.4f} "
             "exposure_factor={8:.4g} doppler_dT={9:+.1f}K "
-            "mb_mult={10:.4f} octane_tag={11}".format(
+            "mb_mult={10:.4f} geom={11} octane_tag={12}".format(
                 beta, strength, gamma, contraction, doppler_fwd,
                 searchlight_mult, fov_mult, dof_factor, exposure_factor,
-                doppler_temp_shift, motion_blur_mult,
+                doppler_temp_shift, motion_blur_mult, geom_label,
                 "yes" if octane_tag is not None else "no",
             )
         )
@@ -632,6 +651,18 @@ def reset_ls_camera_rig(doc, controller, camera):
     _write(controller, lookup, K.UD_OUT_DOPPLER_FWD, 1.0)
     _write(controller, lookup, K.UD_OUT_SEARCHLIGHT, 1.0)
     _write(controller, lookup, K.UD_OUT_DOPPLER_TEMP_SHIFT, 0.0)
+
+    # ---- snap geometry proxy back to identity scale (if present) ---------
+    # We do NOT delete or unwrap the proxy here -- removal is the
+    # explicit "LS Cam: Remove Relativistic Geometry Proxy" command.
+    # Reset just zeroes out the live contraction so the proxy's
+    # children are visible at full size again.
+    proxy = ls_geometry.find_existing_proxy(doc)
+    if proxy is not None:
+        try:
+            proxy[c4d.ID_BASEOBJECT_REL_SCALE] = c4d.Vector(1.0, 1.0, 1.0)
+        except Exception:
+            pass
 
     c4d.EventAdd()
     return True

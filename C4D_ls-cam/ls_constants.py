@@ -17,10 +17,17 @@ rig builder, the UI layer, and the Octane integration helpers.
 # (1000001 - 1000010) reserved by Maxon for in-house testing. Replace it
 # with a registered ID before shipping the plugin.
 PLUGIN_ID = 1000001
+PLUGIN_ID_GEOM_PROXY_ADD = 1000002
+PLUGIN_ID_GEOM_PROXY_REMOVE = 1000003
 
 PLUGIN_NAME = "C4D_ls-cam"
 COMMAND_NAME = "Create LS Relativistic Camera Rig"
 COMMAND_HELP = "Builds a relativistic camera rig (camera + null + controller tag)."
+
+GEOM_PROXY_ADD_NAME = "LS Cam: Add Relativistic Geometry Proxy"
+GEOM_PROXY_ADD_HELP = "Wraps selected (or all) scene objects in a contractable proxy null."
+GEOM_PROXY_REMOVE_NAME = "LS Cam: Remove Relativistic Geometry Proxy"
+GEOM_PROXY_REMOVE_HELP = "Unwraps the LS_Geometry_Proxy and restores object world transforms."
 
 # ---------------------------------------------------------------------------
 # Object names used in the C4D scene
@@ -29,6 +36,7 @@ COMMAND_HELP = "Builds a relativistic camera rig (camera + null + controller tag
 CAMERA_NAME = "LS_Relativistic_Camera"
 RIG_NULL_NAME = "LS_Camera_Rig"
 CONTROLLER_TAG_NAME = "LS_Relativity_Controller"
+GEOMETRY_PROXY_NAME = "LS_Geometry_Proxy"
 
 # ---------------------------------------------------------------------------
 # User-data parameter keys
@@ -56,6 +64,13 @@ UD_DOF_STRENGTH = "dof_strength"
 UD_EXPOSURE_STRENGTH = "exposure_strength"
 
 UD_DEBUG_MODE = "debug_mode"
+
+# ---- Geometry proxy controls ----------------------------------------------
+UD_GEOMETRY_MODE = "geometry_mode"
+UD_VELOCITY_AXIS_SOURCE = "velocity_axis_source"
+UD_CONTRACTION_STRENGTH = "contraction_strength"
+UD_AFFECT_SELECTED_ONLY = "affect_selected_only"
+UD_VELOCITY_CUSTOM_VECTOR = "velocity_custom_vector"
 
 # ---- Computed (read-only) outputs --------------------------------------------
 # These fields are written by ls_evaluator.update_ls_camera_rig() every time
@@ -88,6 +103,21 @@ UD_OUTPUT_KEYS = (
     UD_OUT_SEARCHLIGHT,
     UD_OUT_DOPPLER_TEMP_SHIFT,
 )
+
+# ---- Geometry mode enum ---------------------------------------------------
+# Only PROXY_SCALE is implemented in this pass. POINT_DEFORM is reserved
+# so the dropdown order matches the project brief; selecting it currently
+# falls through to a no-op with a TODO marker.
+GEOM_MODE_OFF = 0
+GEOM_MODE_PROXY_SCALE = 1
+GEOM_MODE_POINT_DEFORM = 2
+GEOM_MODE_ITEMS = ("Off", "Proxy Scale", "Point Deform Approx")
+
+# ---- Velocity axis source enum --------------------------------------------
+AXIS_SOURCE_CAMERA_FORWARD = 0
+AXIS_SOURCE_WORLD_Z = 1
+AXIS_SOURCE_CUSTOM = 2
+AXIS_SOURCE_ITEMS = ("Camera Forward", "World Z", "Custom Vector")
 
 # ---- FOV mode enum ---------------------------------------------------------
 # fov_mode is a CYCLE / DTYPE_LONG user-data field; the integer value
@@ -129,6 +159,11 @@ UD_LABELS = {
     UD_DOF_STRENGTH: "DoF Strength",
     UD_EXPOSURE_STRENGTH: "Exposure Strength",
     UD_DEBUG_MODE: "Debug Mode",
+    UD_GEOMETRY_MODE: "Geometry Mode",
+    UD_VELOCITY_AXIS_SOURCE: "Velocity Axis Source",
+    UD_CONTRACTION_STRENGTH: "Contraction Strength",
+    UD_AFFECT_SELECTED_ONLY: "Affect Selected Only",
+    UD_VELOCITY_CUSTOM_VECTOR: "Velocity Custom Vector",
     UD_OUT_GAMMA: "Gamma (computed)",
     UD_OUT_CONTRACTION: "Contraction Factor (computed)",
     UD_OUT_DOPPLER_FWD: "Doppler Forward Factor (computed)",
@@ -148,6 +183,7 @@ UD_RANGES = {
     UD_FOV_STRENGTH: (0.0, 2.0, 1.0),
     UD_DOF_STRENGTH: (0.0, 2.0, 1.0),
     UD_EXPOSURE_STRENGTH: (0.0, 2.0, 1.0),
+    UD_CONTRACTION_STRENGTH: (0.0, 2.0, 1.0),
 }
 
 # Enum (cycle) fields. ``items`` is the ordered list of dropdown entries;
@@ -157,6 +193,19 @@ UD_ENUMS = {
         "items": FOV_MODE_ITEMS,
         "default": FOV_MODE_SUBTLE,
     },
+    UD_GEOMETRY_MODE: {
+        "items": GEOM_MODE_ITEMS,
+        "default": GEOM_MODE_OFF,
+    },
+    UD_VELOCITY_AXIS_SOURCE: {
+        "items": AXIS_SOURCE_ITEMS,
+        "default": AXIS_SOURCE_CAMERA_FORWARD,
+    },
+}
+
+# Vector user-data fields (DTYPE_VECTOR). Tuple is (default_xyz,).
+UD_VECTORS = {
+    UD_VELOCITY_CUSTOM_VECTOR: ((0.0, 0.0, 1.0),),
 }
 
 # Generous display ranges for the read-only numeric outputs. The slider
@@ -182,6 +231,7 @@ UD_BOOL_DEFAULTS = {
     UD_ENABLE_EXPOSURE: False,
     UD_ENABLE_OCTANE_TAG: False,
     UD_DEBUG_MODE: False,
+    UD_AFFECT_SELECTED_ONLY: True,
 }
 
 # Ordered list driving the order of fields in the Attribute Manager.
@@ -202,6 +252,12 @@ UD_ORDER = [
     UD_ENABLE_EXPOSURE,
     UD_ENABLE_OCTANE_TAG,
     UD_DEBUG_MODE,
+    # Geometry proxy controls.
+    UD_GEOMETRY_MODE,
+    UD_VELOCITY_AXIS_SOURCE,
+    UD_CONTRACTION_STRENGTH,
+    UD_AFFECT_SELECTED_ONLY,
+    UD_VELOCITY_CUSTOM_VECTOR,
     # Computed (read-only) outputs.
     UD_OUT_GAMMA,
     UD_OUT_CONTRACTION,

@@ -8,6 +8,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Non-destructive **LS_Geometry_Proxy** system in `ls_geometry.py`:
+  - `add_geometry_proxy(doc)`: gathers targets (current selection or
+    every top-level non-rig object, gated on
+    `affect_selected_only`), builds a null whose local Z axis is
+    aligned with the resolved velocity direction, and reparents each
+    target under it preserving world transforms. Stamps each child
+    with an `LS_GeomProxyMember` annotation tag holding the original
+    parent's name. Warns (console + dialog) when targets carry
+    animated tracks or skin/morph tags.
+  - `remove_geometry_proxy(doc)`: re-inserts each child at the
+    proxy's parent level (or doc root) with world transforms
+    preserved, strips the marker tags, and deletes the proxy null.
+  - `apply_proxy_contraction(doc, mode, factor, strength)`: called
+    from the evaluator each tick to drive the proxy's local Z scale
+    to `1 + (factor - 1) * strength`.
+  - Velocity axis math: `_camera_forward(camera)` (uses
+    `-camera.GetMg().v3` because C4D cameras look along local -Z),
+    `_resolve_velocity_axis(...)`, `_build_axis_aligned_matrix(...)`.
+- New CommandData plugins registered in `c4d_ls_cam.pyp`:
+  - **LS Cam: Add Relativistic Geometry Proxy** (id `1000002`)
+  - **LS Cam: Remove Relativistic Geometry Proxy** (id `1000003`,
+    greyed out when no proxy is present).
+- Controller user-data fields: `geometry_mode` (Off / Proxy Scale /
+  Point Deform Approx), `velocity_axis_source` (Camera Forward /
+  World Z / Custom Vector), `contraction_strength` (0..2),
+  `affect_selected_only`, and `velocity_custom_vector` (vec3).
+- `_add_vector_ud` helper in `ls_rig.py` for `DTYPE_VECTOR` fields,
+  plus a `UD_VECTORS` table in `ls_constants.py`.
+- `reset_ls_camera_rig` now also snaps any existing proxy back to
+  identity scale (without unwrapping it -- removal is the explicit
+  command).
+- Debug log gains a `geom=<mode>` field.
+
+### Notes
+- Only **Proxy Scale** is implemented in this pass. **Point Deform
+  Approx** is reserved -- selecting it currently no-ops with a TODO
+  comment.
+- Terrell-Penrose rotation, retarded-time sampling, and per-vertex
+  ray-level visual transforms are explicitly out of scope and flagged
+  with TODO comments in `ls_geometry.py`.
+
 - Camera-level relativistic effects in `ls_evaluator`:
   - **FOV mode enum** (`fov_mode`: Subtle / Extreme / Scientific-ish)
     with `fov_strength`. Subtle and Extreme are linear widenings;
@@ -113,8 +154,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - README with installation instructions and module layout.
 
 ### Known limitations
-- Geometry deformation (Lorentz contraction applied to scene meshes)
-  is still not implemented.
+- Geometry contraction is currently uniform-scale-on-a-parent only
+  (the proxy-null approach). Per-vertex deformation, Terrell rotation,
+  and ray-level visual transforms are not implemented.
+- The proxy's orientation is captured at creation time. Changing
+  `velocity_axis_source` or rotating the camera afterwards does not
+  re-orient the proxy -- remove and re-add to refresh.
 - Material / shader updates (Doppler color shift on assets) are not
   implemented; only the global `doppler_temperature_shift` output is
   exposed.

@@ -41,6 +41,11 @@ Tag on LS_Camera_Rig:
 | `enable_relativistic_exposure`  | bool  | false   | —                |
 | `enable_octane_camera_tag`      | bool  | false   | —                |
 | `debug_mode`                    | bool  | false   | —                |
+| `geometry_mode`                 | enum  | Off     | Off / Proxy Scale / Point Deform Approx |
+| `velocity_axis_source`          | enum  | Camera Forward | Camera Forward / World Z / Custom Vector |
+| `contraction_strength`          | float | 1.0     | 0.0 – 2.0        |
+| `affect_selected_only`          | bool  | true    | —                |
+| `velocity_custom_vector`        | vec3  | (0,0,1) | —                |
 
 The whole rig is built in a single undo step — one `Ctrl+Z` removes
 everything the command inserted.
@@ -99,7 +104,61 @@ camera's rest FOV / focus distance / aperture at creation time, and
   a read-only output. **Materials are not modified** at this stage.
 * **Motion-blur multiplier.** Computed every tick but not routed into
   any render engine's settings; visible in the debug log only.
-* **Geometry.** Not deformed.
+* **Geometry.** Not deformed at the point level. The optional
+  ``LS_Geometry_Proxy`` system (see below) wraps selected objects in a
+  parent null and contracts their world transform along the velocity
+  axis, leaving the original meshes untouched.
+
+---
+
+## Geometry proxy
+
+The **LS_Geometry_Proxy** system gives you a non-destructive Lorentz
+contraction without editing point data:
+
+```
+LS_Geometry_Proxy        (Null, oriented so local Z = velocity axis)
+├── <your selected objects, world transforms preserved>
+└── ...
+```
+
+### Workflow
+
+1. Select the scene objects you want to contract.
+2. Run **Extensions ▸ LS Cam: Add Relativistic Geometry Proxy**. The
+   plugin reads `velocity_axis_source` / `velocity_custom_vector` /
+   `affect_selected_only` from the controller, builds a null whose
+   local Z axis is aligned with the chosen velocity, and reparents
+   each target under it (world transforms preserved). An annotation
+   tag named `LS_GeomProxyMember` is attached to each child so the
+   remove command can recognise them later.
+3. With `geometry_mode` set to **Proxy Scale**, the controller's
+   evaluation tag drives the proxy's local Z scale to
+   `1 + (sqrt(1 - β²) - 1) · contraction_strength` on every frame.
+4. To unwrap, run **Extensions ▸ LS Cam: Remove Relativistic Geometry
+   Proxy**. Children are placed back at the proxy's parent level
+   (or the doc root) with their world transforms restored, and the
+   proxy null is deleted. The whole add/remove cycle is undoable.
+
+### Caveats
+
+* **Animated or skinned objects.** The add command warns (console +
+  dialog) when any target carries animated tracks, weight tags, or
+  pose-morph tags. Wrapping still works, but a uniform-scale parent
+  may interact badly with skin deformers — the contraction is applied
+  *on top of* the rig's animation.
+* **No Terrell rotation, no per-vertex transform.** This is a uniform
+  scale along one axis. Real special-relativistic visual effects
+  (Terrell-Penrose rotation, retarded-time sampling, per-pixel
+  aberration) are out of scope for the proxy system; they require a
+  ray-level pass and are flagged with TODO comments in
+  `ls_geometry.py`.
+* **Axis is captured at creation time.** Changing
+  `velocity_axis_source` or the camera orientation after the proxy
+  exists does *not* re-orient the proxy. Remove and re-add to pick
+  up the new direction.
+* The **Point Deform Approx** mode in the dropdown is reserved and
+  currently a no-op with a TODO marker.
 
 ---
 
@@ -219,7 +278,8 @@ C4D_ls-cam/
 ├── c4d_ls_cam.pyp     # plugin entry point + CommandData registration
 ├── ls_constants.py    # IDs, names, user-data definitions
 ├── ls_rig.py          # rig builder (camera, null, tag, user data, undo)
-├── ls_evaluator.py    # update_ls_camera_rig: drives camera + UD outputs
+├── ls_evaluator.py    # update_ls_camera_rig + reset_ls_camera_rig
+├── ls_geometry.py     # LS_Geometry_Proxy add/remove + live contraction
 ├── ls_octane.py       # Octane discovery / attach / dump
 ├── ls_octane_params.py    # symbolic slot table for Octane camera-tag params
 ├── ls_relativity_math.py  # pure-Python relativistic helpers (no c4d import)

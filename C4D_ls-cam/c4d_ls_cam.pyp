@@ -41,6 +41,7 @@ if _PLUGIN_DIR not in sys.path:
 import ls_constants as K  # noqa: E402  -- must follow sys.path tweak
 import ls_rig             # noqa: E402
 import ls_ui              # noqa: E402
+import ls_geometry        # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -91,27 +92,86 @@ class CreateLSRelativisticCameraRig(c4d.plugins.CommandData):
         return c4d.CMD_ENABLED
 
 
+class AddRelativisticGeometryProxy(c4d.plugins.CommandData):
+    """Menu command: wrap selected (or all) objects in LS_Geometry_Proxy."""
+
+    def Execute(self, doc):
+        if doc is None:
+            doc = c4d.documents.GetActiveDocument()
+        if doc is None:
+            ls_ui.error("No active document.")
+            return False
+        try:
+            ls_geometry.add_geometry_proxy(doc)
+        except Exception as exc:
+            traceback.print_exc()
+            ls_ui.error("Add Geometry Proxy failed:\n\n{0}".format(exc))
+            return False
+        return True
+
+    def GetState(self, doc):
+        if doc is None:
+            return 0
+        return c4d.CMD_ENABLED
+
+
+class RemoveRelativisticGeometryProxy(c4d.plugins.CommandData):
+    """Menu command: unwrap LS_Geometry_Proxy and restore world transforms."""
+
+    def Execute(self, doc):
+        if doc is None:
+            doc = c4d.documents.GetActiveDocument()
+        if doc is None:
+            ls_ui.error("No active document.")
+            return False
+        try:
+            ls_geometry.remove_geometry_proxy(doc)
+        except Exception as exc:
+            traceback.print_exc()
+            ls_ui.error("Remove Geometry Proxy failed:\n\n{0}".format(exc))
+            return False
+        return True
+
+    def GetState(self, doc):
+        if doc is None:
+            return 0
+        # Grey the menu out when there's no proxy to remove.
+        return (c4d.CMD_ENABLED if ls_geometry.find_existing_proxy(doc) is not None
+                else 0)
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 
-def _register():
-    """Register the command plugin with Cinema 4D."""
+def _register_one(plugin_id, name, help_text, dat):
+    """Register a single CommandData plugin and log the result."""
     ok = c4d.plugins.RegisterCommandPlugin(
-        id=K.PLUGIN_ID,
-        str=K.COMMAND_NAME,
+        id=plugin_id,
+        str=name,
         info=0,
         icon=None,            # TODO: ship a 32x32 icon in res/ and load it here.
-        help=K.COMMAND_HELP,
-        dat=CreateLSRelativisticCameraRig(),
+        help=help_text,
+        dat=dat,
     )
     if ok:
-        print("[C4D_ls-cam] Registered command plugin id={0}.".format(K.PLUGIN_ID))
+        print("[C4D_ls-cam] Registered command id={0} ({1}).".format(plugin_id, name))
     else:
         print(
-            "[C4D_ls-cam] FAILED to register command plugin id={0}. "
-            "Is the ID already in use?".format(K.PLUGIN_ID)
+            "[C4D_ls-cam] FAILED to register command id={0} ({1}). "
+            "Is the ID already in use?".format(plugin_id, name)
         )
+    return ok
+
+
+def _register():
+    """Register every CommandData plugin shipped by C4D_ls-cam."""
+    _register_one(K.PLUGIN_ID, K.COMMAND_NAME, K.COMMAND_HELP,
+                  CreateLSRelativisticCameraRig())
+    _register_one(K.PLUGIN_ID_GEOM_PROXY_ADD, K.GEOM_PROXY_ADD_NAME,
+                  K.GEOM_PROXY_ADD_HELP, AddRelativisticGeometryProxy())
+    _register_one(K.PLUGIN_ID_GEOM_PROXY_REMOVE, K.GEOM_PROXY_REMOVE_NAME,
+                  K.GEOM_PROXY_REMOVE_HELP, RemoveRelativisticGeometryProxy())
 
 
 if __name__ == "__main__":

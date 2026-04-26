@@ -55,6 +55,18 @@ def _add_bool_ud(host, name, default):
     return desc_id
 
 
+def _add_vector_ud(host, name, default_xyz):
+    """Add a VECTOR user-data field to *host* and return its DescID."""
+    bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_VECTOR)
+    bc[c4d.DESC_NAME] = name
+    bc[c4d.DESC_SHORT_NAME] = name
+    default = c4d.Vector(*default_xyz)
+    bc[c4d.DESC_DEFAULT] = default
+    desc_id = host.AddUserData(bc)
+    host[desc_id] = default
+    return desc_id
+
+
 def _add_enum_ud(host, name, items, default_index):
     """
     Add a CYCLE (dropdown) user-data field to *host* and return its DescID.
@@ -101,6 +113,9 @@ def _build_user_data(tag):
         if key in K.UD_ENUMS:
             spec = K.UD_ENUMS[key]
             ud_ids[key] = _add_enum_ud(tag, label, spec["items"], spec["default"])
+        elif key in K.UD_VECTORS:
+            (default_xyz,) = K.UD_VECTORS[key]
+            ud_ids[key] = _add_vector_ud(tag, label, default_xyz)
         elif key in K.UD_RANGES:
             vmin, vmax, default = K.UD_RANGES[key]
             ud_ids[key] = _add_real_ud(tag, label, default, vmin, vmax)
