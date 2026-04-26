@@ -19,6 +19,8 @@ rig builder, the UI layer, and the Octane integration helpers.
 PLUGIN_ID = 1000001
 PLUGIN_ID_GEOM_PROXY_ADD = 1000002
 PLUGIN_ID_GEOM_PROXY_REMOVE = 1000003
+PLUGIN_ID_DOPPLER_MAT_ADD = 1000004
+PLUGIN_ID_DOPPLER_MAT_RESTORE = 1000005
 
 PLUGIN_NAME = "C4D_ls-cam"
 COMMAND_NAME = "Create LS Relativistic Camera Rig"
@@ -28,6 +30,17 @@ GEOM_PROXY_ADD_NAME = "LS Cam: Add Relativistic Geometry Proxy"
 GEOM_PROXY_ADD_HELP = "Wraps selected (or all) scene objects in a contractable proxy null."
 GEOM_PROXY_REMOVE_NAME = "LS Cam: Remove Relativistic Geometry Proxy"
 GEOM_PROXY_REMOVE_HELP = "Unwraps the LS_Geometry_Proxy and restores object world transforms."
+
+DOPPLER_MAT_ADD_NAME = "LS Cam: Add Doppler Material Controller"
+DOPPLER_MAT_ADD_HELP = "Duplicates affected materials as LS_Doppler_<name> for relativistic colour shifting."
+DOPPLER_MAT_RESTORE_NAME = "LS Cam: Restore Original Materials"
+DOPPLER_MAT_RESTORE_HELP = "Reassigns texture tags to the originals and deletes LS_Doppler_* duplicates."
+
+# Prefix used for every duplicated material; also acts as the recognition
+# token in restore_original_materials() so we never delete a material the
+# user happened to name "LS_Doppler_<x>" by hand (we additionally check
+# for the marker BC slot below).
+DOPPLER_MATERIAL_PREFIX = "LS_Doppler_"
 
 # ---------------------------------------------------------------------------
 # Object names used in the C4D scene
@@ -71,6 +84,13 @@ UD_VELOCITY_AXIS_SOURCE = "velocity_axis_source"
 UD_CONTRACTION_STRENGTH = "contraction_strength"
 UD_AFFECT_SELECTED_ONLY = "affect_selected_only"
 UD_VELOCITY_CUSTOM_VECTOR = "velocity_custom_vector"
+
+# ---- Doppler material controls --------------------------------------------
+# Per-material RGB shift strength. Multiplied into the wavelength-shift
+# alpha by ls_doppler_materials.apply_doppler_color_shift; 0 freezes the
+# duplicates at their baseline colour (matches the "effect off" path
+# the evaluator already runs when enable_doppler_color is False).
+UD_DOPPLER_COLOR_STRENGTH = "doppler_color_strength"
 
 # ---- Computed (read-only) outputs --------------------------------------------
 # These fields are written by ls_evaluator.update_ls_camera_rig() every time
@@ -164,6 +184,7 @@ UD_LABELS = {
     UD_CONTRACTION_STRENGTH: "Contraction Strength",
     UD_AFFECT_SELECTED_ONLY: "Affect Selected Only",
     UD_VELOCITY_CUSTOM_VECTOR: "Velocity Custom Vector",
+    UD_DOPPLER_COLOR_STRENGTH: "Doppler Color Strength",
     UD_OUT_GAMMA: "Gamma (computed)",
     UD_OUT_CONTRACTION: "Contraction Factor (computed)",
     UD_OUT_DOPPLER_FWD: "Doppler Forward Factor (computed)",
@@ -184,6 +205,7 @@ UD_RANGES = {
     UD_DOF_STRENGTH: (0.0, 2.0, 1.0),
     UD_EXPOSURE_STRENGTH: (0.0, 2.0, 1.0),
     UD_CONTRACTION_STRENGTH: (0.0, 2.0, 1.0),
+    UD_DOPPLER_COLOR_STRENGTH: (0.0, 2.0, 1.0),
 }
 
 # Enum (cycle) fields. ``items`` is the ordered list of dropdown entries;
@@ -258,6 +280,8 @@ UD_ORDER = [
     UD_CONTRACTION_STRENGTH,
     UD_AFFECT_SELECTED_ONLY,
     UD_VELOCITY_CUSTOM_VECTOR,
+    # Doppler material controls.
+    UD_DOPPLER_COLOR_STRENGTH,
     # Computed (read-only) outputs.
     UD_OUT_GAMMA,
     UD_OUT_CONTRACTION,

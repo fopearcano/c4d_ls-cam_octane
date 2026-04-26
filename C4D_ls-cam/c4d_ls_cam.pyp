@@ -42,6 +42,7 @@ import ls_constants as K  # noqa: E402  -- must follow sys.path tweak
 import ls_rig             # noqa: E402
 import ls_ui              # noqa: E402
 import ls_geometry        # noqa: E402
+import ls_doppler_materials  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +141,65 @@ class RemoveRelativisticGeometryProxy(c4d.plugins.CommandData):
                 else 0)
 
 
+def _doc_has_doppler_duplicates(doc):
+    """True if *doc* contains at least one LS_Doppler_* duplicate material."""
+    if doc is None:
+        return False
+    m = doc.GetFirstMaterial()
+    while m is not None:
+        if ls_doppler_materials.is_doppler_duplicate(m):
+            return True
+        m = m.GetNext()
+    return False
+
+
+class AddDopplerMaterialController(c4d.plugins.CommandData):
+    """Menu command: duplicate selected materials as LS_Doppler_<name>."""
+
+    def Execute(self, doc):
+        if doc is None:
+            doc = c4d.documents.GetActiveDocument()
+        if doc is None:
+            ls_ui.error("No active document.")
+            return False
+        try:
+            ls_doppler_materials.add_doppler_controller(doc)
+        except Exception as exc:
+            traceback.print_exc()
+            ls_ui.error("Add Doppler Material Controller failed:\n\n{0}".format(exc))
+            return False
+        return True
+
+    def GetState(self, doc):
+        if doc is None:
+            return 0
+        return c4d.CMD_ENABLED
+
+
+class RestoreOriginalMaterials(c4d.plugins.CommandData):
+    """Menu command: re-point texture tags to originals + delete duplicates."""
+
+    def Execute(self, doc):
+        if doc is None:
+            doc = c4d.documents.GetActiveDocument()
+        if doc is None:
+            ls_ui.error("No active document.")
+            return False
+        try:
+            ls_doppler_materials.restore_original_materials(doc)
+        except Exception as exc:
+            traceback.print_exc()
+            ls_ui.error("Restore Original Materials failed:\n\n{0}".format(exc))
+            return False
+        return True
+
+    def GetState(self, doc):
+        if doc is None:
+            return 0
+        # Grey the menu out when there are no Doppler duplicates.
+        return c4d.CMD_ENABLED if _doc_has_doppler_duplicates(doc) else 0
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
@@ -172,6 +232,10 @@ def _register():
                   K.GEOM_PROXY_ADD_HELP, AddRelativisticGeometryProxy())
     _register_one(K.PLUGIN_ID_GEOM_PROXY_REMOVE, K.GEOM_PROXY_REMOVE_NAME,
                   K.GEOM_PROXY_REMOVE_HELP, RemoveRelativisticGeometryProxy())
+    _register_one(K.PLUGIN_ID_DOPPLER_MAT_ADD, K.DOPPLER_MAT_ADD_NAME,
+                  K.DOPPLER_MAT_ADD_HELP, AddDopplerMaterialController())
+    _register_one(K.PLUGIN_ID_DOPPLER_MAT_RESTORE, K.DOPPLER_MAT_RESTORE_NAME,
+                  K.DOPPLER_MAT_RESTORE_HELP, RestoreOriginalMaterials())
 
 
 if __name__ == "__main__":

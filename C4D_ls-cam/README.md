@@ -46,6 +46,7 @@ Tag on LS_Camera_Rig:
 | `contraction_strength`          | float | 1.0     | 0.0 – 2.0        |
 | `affect_selected_only`          | bool  | true    | —                |
 | `velocity_custom_vector`        | vec3  | (0,0,1) | —                |
+| `doppler_color_strength`        | float | 1.0     | 0.0 – 2.0        |
 
 The whole rig is built in a single undo step — one `Ctrl+Z` removes
 everything the command inserted.
@@ -159,6 +160,67 @@ LS_Geometry_Proxy        (Null, oriented so local Z = velocity axis)
   up the new direction.
 * The **Point Deform Approx** mode in the dropdown is reserved and
   currently a no-op with a TODO marker.
+
+---
+
+## Doppler material colour shift
+
+The **Doppler material controller** lets you tint scene materials based
+on the relativistic Doppler factor for the line of sight to the
+objects that use them. Originals are never touched: every affected
+material is cloned, and the clones are renamed `LS_Doppler_<original>`
+and swapped into the texture tags.
+
+### Workflow
+
+1. In the Object Manager, select the objects whose materials should be
+   shifted (their texture-tag materials get picked up automatically).
+   You can additionally select materials in the Material Manager to
+   include them explicitly.
+2. Run **Extensions ▸ LS Cam: Add Doppler Material Controller**. For
+   each selected material the plugin clones it, renames the clone with
+   the `LS_Doppler_` prefix, stores the original name and baseline RGB
+   in the clone's BaseContainer (private slots), and re-points every
+   texture tag in the document that referenced the original at the
+   clone. Wrapped in a single undo step.
+3. With `enable_doppler_color` on, the controller's evaluation tag
+   computes a per-clone Doppler factor each tick:
+   - `forward = camera forward` (or whatever
+     `velocity_axis_source` resolves to)
+   - `look = (centroid_of_users − camera_pos).normalised()`
+   - `cos_theta = forward · look`
+   - `D = doppler_factor(beta, cos_theta)`
+   - colour = `wavelength_shift_rgb_approx(baseline_rgb, D,
+     doppler_color_strength · effect_strength)`
+
+   Approaching objects (cos θ > 0) trend cooler/bluer; receding objects
+   trend warmer/redder. The shift is bounded — `D` is floored,
+   `wavelength_shift_rgb_approx` clamps the bleed and the output RGB,
+   so colours always stay in `[0, 1]`.
+4. To undo, run **Extensions ▸ LS Cam: Restore Original Materials**.
+   Every texture tag pointing at an `LS_Doppler_*` clone is repointed
+   at the original (looked up by stored name); every clone is then
+   deleted. The whole operation is undoable.
+
+### Caveats
+
+* **Classic C4D materials only for live writes.** Octane / Redshift /
+  Arnold node-graph materials store colour inside shader nodes, not on
+  `MATERIAL_COLOR_COLOR`. The plugin still **clones** them so the
+  add/restore lifecycle works identically, but the per-tick colour
+  write is gated to `c4d.Mmaterial`. A single console warning is
+  printed the first time a non-classic material is encountered. See
+  `ls_doppler_materials.py` for the per-engine TODO list.
+* **Texture / multi-shader chains** aren't re-tinted at the texture
+  level — only the flat colour channel is shifted, and the material's
+  textures multiply on top.
+* **Duplicate detection** requires both the `LS_Doppler_` name prefix
+  and a private marker in the clone's BaseContainer, so a user-named
+  `LS_Doppler_MyShinyThing` material that wasn't created by this
+  plugin will never be deleted by the restore command.
+* **Original lookup is by name.** If you rename the original after
+  duplication, restore will leave the affected texture tags
+  unassigned and report which originals it couldn't find.
 
 ---
 
@@ -280,6 +342,7 @@ C4D_ls-cam/
 ├── ls_rig.py          # rig builder (camera, null, tag, user data, undo)
 ├── ls_evaluator.py    # update_ls_camera_rig + reset_ls_camera_rig
 ├── ls_geometry.py     # LS_Geometry_Proxy add/remove + live contraction
+├── ls_doppler_materials.py  # LS_Doppler_<name> material clones + live colour shift
 ├── ls_octane.py       # Octane discovery / attach / dump
 ├── ls_octane_params.py    # symbolic slot table for Octane camera-tag params
 ├── ls_relativity_math.py  # pure-Python relativistic helpers (no c4d import)

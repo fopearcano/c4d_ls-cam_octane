@@ -8,6 +8,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Non-destructive **Doppler material controller** in
+  `ls_doppler_materials.py`:
+  - `add_doppler_controller(doc)`: gathers the unique set of materials
+    from the Material-Manager selection plus every texture tag on
+    selected objects, clones each one as
+    `LS_Doppler_<OriginalName>`, captures baseline RGB +
+    original-name + original-type into private BaseContainer slots,
+    and re-points every texture tag in the document. One undo step.
+  - `restore_original_materials(doc)`: re-points every texture tag
+    that referenced an `LS_Doppler_*` clone at the original (found by
+    stored name) and deletes the clones. Reports any originals it
+    can't find by name.
+  - `apply_doppler_color_shift(doc, controller, camera, beta,
+    strength)`: per-tick colour write driven by
+    `RM.doppler_factor(beta, cos_theta)` and
+    `RM.wavelength_shift_rgb_approx`. `cos_theta` derives from
+    forward · `(centroid_of_users − camera_pos).normalized()`, with
+    `forward` resolved through the same `velocity_axis_source` /
+    `velocity_custom_vector` controls the geometry pass uses.
+  - `restore_baseline_colors(doc)`: snaps duplicates back to
+    baseline RGB without unwrapping (used when
+    `enable_doppler_color` is False, and from `reset_ls_camera_rig`).
+  - `is_doppler_duplicate(mat)`: requires both the name prefix AND
+    the private BC marker, so a user-named `LS_Doppler_*` material
+    is never deleted.
+- New CommandData plugins registered in `c4d_ls_cam.pyp`:
+  - **LS Cam: Add Doppler Material Controller** (id `1000004`).
+  - **LS Cam: Restore Original Materials** (id `1000005`, greyed
+    out when no `LS_Doppler_*` duplicates exist).
+- `doppler_color_strength` user-data field (float, 0..2, default 1).
+- Public aliases `ls_geometry.camera_forward_vector` and
+  `ls_geometry.resolve_velocity_axis` so the doppler module reuses
+  the exact axis resolution the geometry pass already uses.
+
+### Notes
+- Live colour writes are gated to classic `c4d.Mmaterial` only.
+  Octane / Redshift / Arnold node-graph materials are still **cloned**
+  (so add/restore work identically), but their per-tick colour write
+  is skipped with a one-shot console warning. Per-engine
+  node-material support is a TODO documented at the top of
+  `ls_doppler_materials.py`.
+- Texture / multi-shader chains aren't re-tinted; only the flat
+  `MATERIAL_COLOR_COLOR` channel is shifted.
+- Original lookup is by name. Renaming the original after
+  duplication breaks restore for that material; the restore command
+  reports which names it couldn't find.
+
 - Non-destructive **LS_Geometry_Proxy** system in `ls_geometry.py`:
   - `add_geometry_proxy(doc)`: gathers targets (current selection or
     every top-level non-rig object, gated on

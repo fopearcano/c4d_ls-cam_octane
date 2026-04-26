@@ -33,6 +33,7 @@ import ls_relativity_math as RM
 import ls_octane
 import ls_octane_params as OP
 import ls_geometry
+import ls_doppler_materials
 
 
 # Prefix used to store per-Octane-slot baselines on the controller as
@@ -517,8 +518,30 @@ def update_ls_camera_rig(doc, controller, camera):
     )
 
     # ---- effect 4: Doppler colour temperature ----------------------------
-    # Materials are NOT modified per the spec -- we just expose the
-    # computed delta as a read-only output for downstream consumers.
+    # Scalar output; the Doppler-material colour shift below is the
+    # actual material driver.
+
+    # ---- effect 4b: Doppler colour shift on duplicate materials ----------
+    # The duplicates themselves are created/removed via the menu commands
+    # in ls_doppler_materials.py; this call only paints them every tick.
+    # When the Doppler flag is off we snap the duplicates back to their
+    # baseline colour so toggling the flag is fully reversible without
+    # having to rebuild any duplicates.
+    enable_doppler = bool(_read(controller, lookup, K.UD_ENABLE_DOPPLER, default=True))
+    doppler_color_strength = max(0.0, _coerce_float(
+        _read(controller, lookup, K.UD_DOPPLER_COLOR_STRENGTH, default=1.0), 1.0))
+    if enable_doppler:
+        # effect_strength compounds with the per-effect strength so a
+        # single master slider can dim everything at once.
+        ls_doppler_materials.apply_doppler_color_shift(
+            doc=doc,
+            controller=controller,
+            camera=camera,
+            beta=beta,
+            strength=doppler_color_strength * strength,
+        )
+    else:
+        ls_doppler_materials.restore_baseline_colors(doc)
 
     # ---- effect 5: Geometry contraction (proxy null) ---------------------
     # The proxy null itself is created/removed via the menu commands in
@@ -651,6 +674,13 @@ def reset_ls_camera_rig(doc, controller, camera):
     _write(controller, lookup, K.UD_OUT_DOPPLER_FWD, 1.0)
     _write(controller, lookup, K.UD_OUT_SEARCHLIGHT, 1.0)
     _write(controller, lookup, K.UD_OUT_DOPPLER_TEMP_SHIFT, 0.0)
+
+    # ---- snap Doppler material duplicates back to baseline (if any) -----
+    # We do NOT delete the duplicates -- restoration of the originals is
+    # the explicit "LS Cam: Restore Original Materials" command. Reset
+    # just paints the duplicates with their baseline RGB so the viewport
+    # looks as it did before any beta sweep.
+    ls_doppler_materials.restore_baseline_colors(doc)
 
     # ---- snap geometry proxy back to identity scale (if present) ---------
     # We do NOT delete or unwrap the proxy here -- removal is the

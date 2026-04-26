@@ -139,6 +139,17 @@ def find_existing_proxy(doc):
 # Velocity axis + matrix helpers
 # ---------------------------------------------------------------------------
 
+# Public aliases -- other modules (e.g. ls_doppler_materials) import these.
+def camera_forward_vector(camera):
+    """Public alias for :func:`_camera_forward`."""
+    return _camera_forward(camera)
+
+
+def resolve_velocity_axis(camera, source_idx, custom_vec):
+    """Public alias for :func:`_resolve_velocity_axis`."""
+    return _resolve_velocity_axis(camera, source_idx, custom_vec)
+
+
 def _camera_forward(camera):
     """
     Return the camera's forward direction in world space as a unit vector.
