@@ -285,6 +285,42 @@ Set `debug_mode` on the controller to print per-target lines:
 
 ---
 
+## Presets (A Slower Speed of Light)
+
+Run **Extensions ▸ LS Cam: Apply Relativity Preset** to open a small
+modeless dialog with a preset dropdown plus *Apply* and *Reset*
+buttons. Inspired by MIT Game Lab's *A Slower Speed of Light*, the
+shipped presets are:
+
+| Preset           | β     | effect | fov | dof | doppler | search | contraction |
+|------------------|-------|--------|-----|-----|---------|--------|-------------|
+| Human Speed      | 0.001 | 1.0    | 1.0 | 0.0 | 1.0     | 1.0    | 1.0         |
+| Orb 25           | 0.25  | 1.0    | 1.0 | 0.5 | 1.0     | 1.0    | 1.0         |
+| Orb 50           | 0.50  | 1.0    | 1.0 | 1.0 | 1.0     | 1.0    | 1.0         |
+| Orb 75           | 0.75  | 1.0    | 1.0 | 1.0 | 1.2     | 1.2    | 1.0         |
+| Near Light       | 0.95  | 1.5    | 1.5 | 1.5 | 1.5     | 1.5    | 1.0         |
+| Absurd Artistic  | 0.99  | 2.0    | 2.0 | 2.0 | 2.0     | 2.0    | 1.0         |
+
+* **Apply** writes only the seven strength/beta fields above. The
+  per-effect `enable_*` toggles, the `geometry_mode` /
+  `searchlight_mode` enums, and `debug_mode` are left alone — so a
+  preset never accidentally enables an effect whose dependent system
+  (e.g. the geometry proxy) hasn't been set up.
+* **Reset** calls `ls_evaluator.reset_ls_camera_rig(doc, controller,
+  camera)` on the active rig, snapping every camera baseline, every
+  Doppler material clone, every searchlight baseline, and the proxy
+  scale back to identity.
+
+### Editing presets
+
+`ls_presets.PRESETS_ORDERED` is the single source of truth — add or
+edit `(name, dict)` tuples there and both the dialog dropdown and
+`apply_preset` will pick them up. Unknown / typo'd UD keys are
+ignored at apply time with a console warning, so a renamed constant
+won't crash the preset system.
+
+---
+
 ## Installation
 
 1. **Locate your Cinema 4D plugin folder.**
@@ -405,6 +441,7 @@ C4D_ls-cam/
 ├── ls_geometry.py     # LS_Geometry_Proxy add/remove + live contraction
 ├── ls_doppler_materials.py  # LS_Doppler_<name> material clones + live colour shift
 ├── ls_searchlight.py  # per-target relativistic-beaming intensity (viewport / luminance / Octane)
+├── ls_presets.py      # A Slower Speed of Light preset table + apply_preset
 ├── ls_octane.py       # Octane discovery / attach / dump
 ├── ls_octane_params.py    # symbolic slot table for Octane camera-tag params
 ├── ls_relativity_math.py  # pure-Python relativistic helpers (no c4d import)

@@ -21,6 +21,7 @@ PLUGIN_ID_GEOM_PROXY_ADD = 1000002
 PLUGIN_ID_GEOM_PROXY_REMOVE = 1000003
 PLUGIN_ID_DOPPLER_MAT_ADD = 1000004
 PLUGIN_ID_DOPPLER_MAT_RESTORE = 1000005
+PLUGIN_ID_PRESETS = 1000006
 
 PLUGIN_NAME = "C4D_ls-cam"
 COMMAND_NAME = "Create LS Relativistic Camera Rig"
@@ -35,6 +36,9 @@ DOPPLER_MAT_ADD_NAME = "LS Cam: Add Doppler Material Controller"
 DOPPLER_MAT_ADD_HELP = "Duplicates affected materials as LS_Doppler_<name> for relativistic colour shifting."
 DOPPLER_MAT_RESTORE_NAME = "LS Cam: Restore Original Materials"
 DOPPLER_MAT_RESTORE_HELP = "Reassigns texture tags to the originals and deletes LS_Doppler_* duplicates."
+
+PRESETS_NAME = "LS Cam: Apply Relativity Preset"
+PRESETS_HELP = "Opens a dialog to apply curated beta/strength presets to the controller."
 
 # Prefix used for every duplicated material; also acts as the recognition
 # token in restore_original_materials() so we never delete a material the

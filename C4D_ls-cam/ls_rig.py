@@ -275,6 +275,54 @@ def _make_controller_tag(host):
 
 
 # ---------------------------------------------------------------------------
+# Rig discovery (shared by presets, geometry, evaluator, etc.)
+# ---------------------------------------------------------------------------
+
+def find_rig_in_document(doc):
+    """
+    Walk *doc* and locate the LS_Camera_Rig.
+
+    Returns
+    -------
+    tuple
+        ``(rig_null, camera, controller_tag)``. Any element that
+        cannot be found is returned as ``None``. Safe to call on an
+        empty/None document.
+    """
+    if doc is None:
+        return (None, None, None)
+
+    rig = None
+    obj = doc.GetFirstObject()
+    while obj is not None:
+        if obj.GetName() == K.RIG_NULL_NAME and obj.GetType() == c4d.Onull:
+            rig = obj
+            break
+        obj = obj.GetNext()
+    if rig is None:
+        return (None, None, None)
+
+    camera = None
+    child = rig.GetDown()
+    while child is not None:
+        if child.GetType() == c4d.Ocamera:
+            camera = child
+            break
+        child = child.GetNext()
+
+    controller = None
+    tag = rig.GetFirstTag()
+    while tag is not None:
+        if (tag.GetType() == c4d.Tpython
+                and tag.GetName() == K.CONTROLLER_TAG_NAME):
+            controller = tag
+            break
+        tag = tag.GetNext()
+
+    return (rig, camera, controller)
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 

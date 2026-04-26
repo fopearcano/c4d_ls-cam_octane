@@ -8,6 +8,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Preset system inspired by *A Slower Speed of Light*** in
+  `ls_presets.py`:
+  - `PRESETS_ORDERED` table holds six `(name, dict)` tuples covering
+    `Human Speed` (β 0.001), `Orb 25` (β 0.25), `Orb 50` (β 0.50),
+    `Orb 75` (β 0.75), `Near Light` (β 0.95), `Absurd Artistic`
+    (β 0.99). Each preset writes the seven required strength/beta
+    fields (`beta_velocity`, `effect_strength`, `fov_strength`,
+    `dof_strength`, `doppler_color_strength`,
+    `searchlight_strength`, `contraction_strength`).
+  - `apply_preset(controller, preset_name)` writes the preset's
+    values via the same UD-label-lookup pattern the evaluator uses;
+    missing/typo'd keys log a single warning and are skipped.
+  - Module is importable outside Cinema 4D (lazy `import c4d` /
+    `import ls_ui`) so the preset table can be sanity-checked
+    standalone.
+- New CommandData plugin **LS Cam: Apply Relativity Preset** (id
+  `1000006`) registered in `c4d_ls_cam.pyp`. Opens a modeless
+  `GeDialog` with a preset dropdown plus *Apply* and *Reset*
+  buttons. Apply finds the rig via `ls_rig.find_rig_in_document(doc)`
+  and writes the preset; Reset calls
+  `ls_evaluator.reset_ls_camera_rig`. The dialog supports
+  `RestoreLayout` so it survives layout changes / Reload Python
+  Plugins.
+- `ls_rig.find_rig_in_document(doc)` public helper returning
+  `(rig_null, camera, controller_tag)` -- shared by the preset
+  command (and available to any future module that needs to locate
+  the rig).
+
+### Notes
+- Presets only touch *strength* knobs and beta. The per-effect
+  `enable_*` toggles, the `geometry_mode` / `searchlight_mode`
+  enums, and `debug_mode` are left alone, so a preset never
+  accidentally enables an effect whose dependent system (proxy /
+  Doppler clones) hasn't been set up yet.
+
+### Added
 - **Searchlight (relativistic beaming) per-target driver** in
   `ls_searchlight.py`:
   - `apply_searchlight(doc, controller, camera, beta, strength,
