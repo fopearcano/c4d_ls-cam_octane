@@ -47,6 +47,9 @@ Tag on LS_Camera_Rig:
 | `affect_selected_only`          | bool  | true    | —                |
 | `velocity_custom_vector`        | vec3  | (0,0,1) | —                |
 | `doppler_color_strength`        | float | 1.0     | 0.0 – 2.0        |
+| `searchlight_strength`          | float | 1.0     | 0.0 – 2.0        |
+| `searchlight_mode`              | enum  | Viewport Only | Viewport Only / Material Luminance / Octane Material Placeholder |
+| `max_intensity_multiplier`      | float | 10.0    | 1.0 – 1000.0     |
 
 The whole rig is built in a single undo step — one `Ctrl+Z` removes
 everything the command inserted.
@@ -224,6 +227,64 @@ and swapped into the texture tags.
 
 ---
 
+## Searchlight (relativistic beaming) effect
+
+While `enable_searchlight_effect` is on, the controller's evaluation
+tag drives a per-target intensity multiplier
+``RM.searchlight_intensity_factor(beta, cos_theta, strength)`` for
+each *controlled* object — clamped to `max_intensity_multiplier` to
+prevent absurd blowouts at high β.
+
+### Controlled-object set
+
+The plugin never paints the whole scene. The "controlled" set is the
+union of:
+
+* the children of `LS_Geometry_Proxy`, if it exists, and
+* every object whose texture tags reference an `LS_Doppler_<x>`
+  material clone.
+
+If neither system has been used, the searchlight effect is a no-op
+and the evaluator logs a debug line saying so.
+
+### Modes (`searchlight_mode`)
+
+* **Viewport Only.** Per-object writes to `ID_BASEOBJECT_USECOLOR`
+  (=2 / always) and `ID_BASEOBJECT_COLOR`. Cheap, always available,
+  visible only in the viewport. Baseline `USECOLOR` + colour are
+  stamped on the object in private BaseContainer slots before the
+  first write so they can be restored 1:1.
+* **Material Luminance.** Enables `MATERIAL_USE_LUMINANCE` and writes
+  `MATERIAL_LUMINANCE_COLOR` on each `LS_Doppler_<x>` clone. The
+  glow tints from the live `MATERIAL_COLOR_COLOR` of the clone, so
+  the emission tracks the Doppler shift naturally. `cos_theta` is
+  computed per-material from the centroid of the objects using it.
+  Renders in production but only affects already-wrapped materials —
+  run **LS Cam: Add Doppler Material Controller** first.
+* **Octane Material Placeholder.** Reserved. Currently a one-shot
+  logged no-op; node-material emission slots have to be mapped per
+  Octane version (see TODO at the top of `ls_searchlight.py`).
+
+### Restore
+
+Switching modes (or disabling the effect) restores the previous
+mode's baselines automatically. `reset_ls_camera_rig` calls
+`ls_searchlight.restore_searchlight(doc)` to undo every stamped
+baseline. Markers are cleared on restore so a subsequent re-enable
+re-captures from the now-current state — you can edit baselines
+while the effect is off and the plugin will respect your edits.
+
+### Debugging
+
+Set `debug_mode` on the controller to print per-target lines:
+
+```
+[searchlight][debug] viewport ObjectName: cos_theta=+0.7320 factor=2.31 color=Vector(...)
+[searchlight][debug] luminance LS_Doppler_Skin: cos_theta=-0.4011 factor=0.42 glow=Vector(0,0,0)
+```
+
+---
+
 ## Installation
 
 1. **Locate your Cinema 4D plugin folder.**
@@ -343,6 +404,7 @@ C4D_ls-cam/
 ├── ls_evaluator.py    # update_ls_camera_rig + reset_ls_camera_rig
 ├── ls_geometry.py     # LS_Geometry_Proxy add/remove + live contraction
 ├── ls_doppler_materials.py  # LS_Doppler_<name> material clones + live colour shift
+├── ls_searchlight.py  # per-target relativistic-beaming intensity (viewport / luminance / Octane)
 ├── ls_octane.py       # Octane discovery / attach / dump
 ├── ls_octane_params.py    # symbolic slot table for Octane camera-tag params
 ├── ls_relativity_math.py  # pure-Python relativistic helpers (no c4d import)

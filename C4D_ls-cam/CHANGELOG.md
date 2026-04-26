@@ -8,6 +8,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Searchlight (relativistic beaming) per-target driver** in
+  `ls_searchlight.py`:
+  - `apply_searchlight(doc, controller, camera, beta, strength,
+    mode, max_intensity, debug)`: dispatches by mode.
+  - **Viewport Only** mode writes `ID_BASEOBJECT_USECOLOR` (=2) and
+    a baseline-tinted `ID_BASEOBJECT_COLOR` per controlled object;
+    output is per-channel-clamped to `[0, 1]` so out-of-gamut values
+    never reach the viewport.
+  - **Material Luminance** mode enables
+    `MATERIAL_USE_LUMINANCE` and writes `MATERIAL_LUMINANCE_COLOR`
+    on every `LS_Doppler_<x>` classic-material clone; glow tints
+    from the clone's live colour so the emission tracks the
+    Doppler shift. `cos_theta` is per-material via the centroid of
+    its user objects.
+  - **Octane Material Placeholder** mode is a one-shot logged
+    no-op; node-material emission needs per-Octane-version mapping
+    (TODO in `ls_searchlight.py`).
+  - `restore_searchlight(doc)`: walks every stamped object +
+    material, writes the saved baseline back, clears the marker.
+  - "Controlled object" = geometry-proxy children ∪ objects whose
+    texture tags reference an `LS_Doppler_<x>` clone. The
+    searchlight is a no-op if neither system has been used.
+  - Switching modes auto-restores the previous mode's baselines.
+- New controller user-data fields: `searchlight_strength` (float
+  0..2, default 1), `searchlight_mode` (enum), and
+  `max_intensity_multiplier` (float 1..1000, default 10) acting as
+  the absolute clamp ceiling on the per-target factor.
+
+### Changed
+- `ls_evaluator.update_ls_camera_rig`:
+  - Reads the three new searchlight UD fields and calls
+    `ls_searchlight.apply_searchlight` when
+    `enable_searchlight_effect` is on, `restore_searchlight` when
+    off. `searchlight_strength * effect_strength` is the compounded
+    strength passed to the math helper.
+  - `reset_ls_camera_rig` now also calls `restore_searchlight(doc)`.
+
+### Notes
+- Live colour writes are still gated to classic `c4d.Mmaterial`
+  (Material Luminance mode skips Octane / Redshift / Arnold
+  duplicates). Octane node-material emission is on the TODO list.
+- The Material Luminance mode's `cos_theta` is per-material (via
+  user centroid), not per-object: per-object overrides would
+  require per-tag overrides which are out of scope.
+
+### Added
 - Non-destructive **Doppler material controller** in
   `ls_doppler_materials.py`:
   - `add_doppler_controller(doc)`: gathers the unique set of materials

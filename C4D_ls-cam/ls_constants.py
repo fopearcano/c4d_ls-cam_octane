@@ -92,6 +92,13 @@ UD_VELOCITY_CUSTOM_VECTOR = "velocity_custom_vector"
 # the evaluator already runs when enable_doppler_color is False).
 UD_DOPPLER_COLOR_STRENGTH = "doppler_color_strength"
 
+# ---- Searchlight controls -------------------------------------------------
+# enable_searchlight_effect already exists above as the master toggle;
+# these three add the per-effect knobs requested by the brief.
+UD_SEARCHLIGHT_STRENGTH = "searchlight_strength"
+UD_SEARCHLIGHT_MODE = "searchlight_mode"
+UD_MAX_INTENSITY_MULTIPLIER = "max_intensity_multiplier"
+
 # ---- Computed (read-only) outputs --------------------------------------------
 # These fields are written by ls_evaluator.update_ls_camera_rig() every time
 # the controller is evaluated. They are exposed as user-data so artists can
@@ -132,6 +139,24 @@ GEOM_MODE_OFF = 0
 GEOM_MODE_PROXY_SCALE = 1
 GEOM_MODE_POINT_DEFORM = 2
 GEOM_MODE_ITEMS = ("Off", "Proxy Scale", "Point Deform Approx")
+
+# ---- Searchlight mode enum ------------------------------------------------
+# Modes determine WHERE the per-object intensity factor is written:
+#   VIEWPORT   -- ID_BASEOBJECT_USECOLOR + ID_BASEOBJECT_COLOR (cheap,
+#                 always available, only visible in the viewport).
+#   LUMINANCE  -- MATERIAL_USE_LUMINANCE + MATERIAL_LUMINANCE_COLOR on
+#                 the LS_Doppler_<x> material clones (renders, but only
+#                 affects the materials that have already been wrapped).
+#   OCTANE     -- placeholder for future Octane node-material emission
+#                 driving; currently a one-shot logged no-op.
+SEARCHLIGHT_MODE_VIEWPORT = 0
+SEARCHLIGHT_MODE_LUMINANCE = 1
+SEARCHLIGHT_MODE_OCTANE = 2
+SEARCHLIGHT_MODE_ITEMS = (
+    "Viewport Only",
+    "Material Luminance",
+    "Octane Material Placeholder",
+)
 
 # ---- Velocity axis source enum --------------------------------------------
 AXIS_SOURCE_CAMERA_FORWARD = 0
@@ -185,6 +210,9 @@ UD_LABELS = {
     UD_AFFECT_SELECTED_ONLY: "Affect Selected Only",
     UD_VELOCITY_CUSTOM_VECTOR: "Velocity Custom Vector",
     UD_DOPPLER_COLOR_STRENGTH: "Doppler Color Strength",
+    UD_SEARCHLIGHT_STRENGTH: "Searchlight Strength",
+    UD_SEARCHLIGHT_MODE: "Searchlight Mode",
+    UD_MAX_INTENSITY_MULTIPLIER: "Max Intensity Multiplier",
     UD_OUT_GAMMA: "Gamma (computed)",
     UD_OUT_CONTRACTION: "Contraction Factor (computed)",
     UD_OUT_DOPPLER_FWD: "Doppler Forward Factor (computed)",
@@ -206,6 +234,8 @@ UD_RANGES = {
     UD_EXPOSURE_STRENGTH: (0.0, 2.0, 1.0),
     UD_CONTRACTION_STRENGTH: (0.0, 2.0, 1.0),
     UD_DOPPLER_COLOR_STRENGTH: (0.0, 2.0, 1.0),
+    UD_SEARCHLIGHT_STRENGTH: (0.0, 2.0, 1.0),
+    UD_MAX_INTENSITY_MULTIPLIER: (1.0, 1000.0, 10.0),
 }
 
 # Enum (cycle) fields. ``items`` is the ordered list of dropdown entries;
@@ -222,6 +252,10 @@ UD_ENUMS = {
     UD_VELOCITY_AXIS_SOURCE: {
         "items": AXIS_SOURCE_ITEMS,
         "default": AXIS_SOURCE_CAMERA_FORWARD,
+    },
+    UD_SEARCHLIGHT_MODE: {
+        "items": SEARCHLIGHT_MODE_ITEMS,
+        "default": SEARCHLIGHT_MODE_VIEWPORT,
     },
 }
 
@@ -282,6 +316,10 @@ UD_ORDER = [
     UD_VELOCITY_CUSTOM_VECTOR,
     # Doppler material controls.
     UD_DOPPLER_COLOR_STRENGTH,
+    # Searchlight controls.
+    UD_SEARCHLIGHT_STRENGTH,
+    UD_SEARCHLIGHT_MODE,
+    UD_MAX_INTENSITY_MULTIPLIER,
     # Computed (read-only) outputs.
     UD_OUT_GAMMA,
     UD_OUT_CONTRACTION,

@@ -34,6 +34,7 @@ import ls_octane
 import ls_octane_params as OP
 import ls_geometry
 import ls_doppler_materials
+import ls_searchlight
 
 
 # Prefix used to store per-Octane-slot baselines on the controller as
@@ -543,6 +544,34 @@ def update_ls_camera_rig(doc, controller, camera):
     else:
         ls_doppler_materials.restore_baseline_colors(doc)
 
+    # ---- effect 4c: Searchlight per-target intensity --------------------
+    # The scalar searchlight_mult above is just a single forward-direction
+    # number; the per-target driver here paints viewport colours or
+    # material-luminance channels for each "controlled" object. Mode +
+    # strength + ceiling come from dedicated UD fields.
+    searchlight_strength = max(0.0, _coerce_float(
+        _read(controller, lookup, K.UD_SEARCHLIGHT_STRENGTH, default=1.0), 1.0))
+    searchlight_mode = int(_coerce_float(
+        _read(controller, lookup, K.UD_SEARCHLIGHT_MODE,
+              default=K.SEARCHLIGHT_MODE_VIEWPORT),
+        K.SEARCHLIGHT_MODE_VIEWPORT))
+    max_intensity = max(1.0, _coerce_float(
+        _read(controller, lookup, K.UD_MAX_INTENSITY_MULTIPLIER, default=10.0),
+        10.0))
+    if enable_searchlight:
+        ls_searchlight.apply_searchlight(
+            doc=doc,
+            controller=controller,
+            camera=camera,
+            beta=beta,
+            strength=searchlight_strength * strength,
+            mode=searchlight_mode,
+            max_intensity=max_intensity,
+            debug=debug,
+        )
+    else:
+        ls_searchlight.restore_searchlight(doc)
+
     # ---- effect 5: Geometry contraction (proxy null) ---------------------
     # The proxy null itself is created/removed via the menu commands in
     # ls_geometry.py; this call only drives its local Z scale every tick.
@@ -681,6 +710,13 @@ def reset_ls_camera_rig(doc, controller, camera):
     # just paints the duplicates with their baseline RGB so the viewport
     # looks as it did before any beta sweep.
     ls_doppler_materials.restore_baseline_colors(doc)
+
+    # ---- restore searchlight baselines ------------------------------------
+    # Both viewport and material-luminance modes leave private BC slots
+    # on each touched object/material; restore writes the baseline back
+    # and clears the markers so the next enable re-captures from the
+    # current state.
+    ls_searchlight.restore_searchlight(doc)
 
     # ---- snap geometry proxy back to identity scale (if present) ---------
     # We do NOT delete or unwrap the proxy here -- removal is the
